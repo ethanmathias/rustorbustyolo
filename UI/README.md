@@ -20,17 +20,28 @@ This folder contains the files needed to run batch rust segmentation through a s
 
 ## Local setup
 
-Install the local dependency:
+### macOS
+
+Run the installer from the repo root:
 
 ```bash
-python3.12 -m pip install --user -r requirements.txt
+chmod +x install.sh
+./install.sh
 ```
 
 Then launch:
 
 ```bash
-./launch_rust_portal_gui.sh
+./RustOrBust.command
 ```
+
+Or run the UI directly:
+
+```bash
+"$HOME/Library/Application Support/rustorbust-venv/bin/python3" UI/rust_portal_gui.py
+```
+
+### Windows
 
 On Windows:
 
@@ -59,3 +70,4 @@ Inside that folder you'll get:
 - The UI uses the explicit UVA Slurm paths already validated in this project.
 - The default model is `models/35images.pt`.
 - The default remote workspace root is `/u/{username}/rustorbustyolo_jobs`.
+- On macOS, the installer creates its virtual environment in `~/Library/Application Support/rustorbust-venv`.
