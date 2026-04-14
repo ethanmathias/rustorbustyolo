@@ -42,6 +42,15 @@ if errorlevel 1 (
     exit /b 1
 )
 
+where tesseract >nul 2>nul
+if errorlevel 1 (
+    echo.
+    echo Note: the Python OCR package was installed, but the Tesseract OCR executable was not found on PATH.
+    echo Scale-label OCR will stay disabled until Tesseract OCR is installed.
+    echo You can install it from:
+    echo   https://github.com/UB-Mannheim/tesseract/wiki
+)
+
 echo.
 echo Setup complete.
 echo Run RustOrBust.bat to launch the UI.

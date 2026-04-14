@@ -52,6 +52,9 @@ install_windows.bat
 RustOrBust.bat
 ```
 
+Both installers install the Python OCR package `pytesseract`.
+For OCR to actually work, the system `tesseract` executable must also be installed and available on PATH.
+
 ## Output location
 
 Each run is downloaded into:

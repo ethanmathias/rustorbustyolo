@@ -16,7 +16,7 @@ The installer will:
 - find a Tk-enabled Python on your Mac
 - install a known-good Python 3.13 via `uv` if no safe Tk runtime is already available
 - create a local virtual environment at `~/Library/Application Support/rustorbust-venv`
-- install the UI dependencies from `UI/requirements.txt`
+- install the UI dependencies from `UI/requirements.txt`, including `pytesseract` for OCR
 - create or refresh `RustOrBust.command`
 
 After setup, launch the app with:
@@ -56,6 +56,7 @@ The remote job can also bootstrap `torch`, `torchvision`, and `ultralytics` on t
 - On macOS, `install.sh` installs the local UI dependencies into `~/Library/Application Support/rustorbust-venv`
 - On macOS, `install.sh` can also bootstrap a safe Tk-capable Python 3.13 via `uv`
 - On Windows, `install_windows.bat` creates a local `.venv` and installs the UI dependencies from `UI\requirements.txt`
+- OCR also requires the `tesseract` executable itself to be installed on the machine
 
 ## Notes
 

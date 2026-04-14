@@ -185,6 +185,14 @@ echo "Upgrading pip..."
 echo "Installing RustOrBust UI dependencies..."
 "$VENV_DIR/bin/python3" -m pip install -r "$REQ_FILE"
 
+if ! command -v tesseract >/dev/null 2>&1; then
+    echo
+    echo "Note: the Python OCR package was installed, but the 'tesseract' binary was not found on PATH."
+    echo "Scale-label OCR will stay disabled until Tesseract OCR is installed."
+    echo "On macOS with Homebrew, you can install it with:"
+    echo "  brew install tesseract"
+fi
+
 cat > "$LAUNCHER" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
