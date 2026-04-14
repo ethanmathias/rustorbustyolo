@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from queue import Empty, Queue
-from tkinter import (BooleanVar, Canvas, IntVar, StringVar, Tk,
-                     filedialog, messagebox, ttk)
+from tkinter import (BooleanVar, Canvas, IntVar, Listbox, SINGLE,
+                     StringVar, Tk, filedialog, messagebox, ttk)
 from tkinter.scrolledtext import ScrolledText
 
 try:
@@ -16,10 +16,16 @@ except ImportError as exc:
     raise SystemExit("Paramiko is required.  Run:  python3 -m pip install paramiko") from exc
 
 try:
-    from PIL import Image, ImageTk, ImageFilter
+    from PIL import Image, ImageTk, ImageOps, ImageFilter, ImageEnhance
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
+
+try:
+    import pytesseract
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
 
 SSH_HOST = "portal.cs.virginia.edu"
 SBATCH   = "/sw/ubuntu/custom/slurm/current/bin/sbatch"
@@ -96,7 +102,8 @@ def apply_dark_theme(root):
     s.configure("Card.TLabel", background=PANEL_BG, foreground=FG)
     s.configure("Dim.TLabel", background=PANEL_BG, foreground=FG_DIM, font=("Helvetica", 10))
     s.configure("Stat.TLabel", background=PANEL_BG, foreground=FG, font=("Helvetica", 11))
-    s.configure("StatVal.TLabel", background=PANEL_BG, foreground=ACCENT, font=("Helvetica", 11, "bold"))
+    s.configure("StatVal.TLabel", background=PANEL_BG, foreground="#66ff88", font=("Helvetica", 11, "bold"))
+    s.configure("StatHead.TLabel", background=PANEL_BG, foreground=ACCENT, font=("Helvetica", 10, "bold"))
     s.configure("TLabelframe", background=PANEL_BG, foreground=FG, bordercolor=BORDER)
     s.configure("TLabelframe.Label", background=PANEL_BG, foreground=ACCENT, font=("Helvetica", 11, "bold"))
     s.configure("TEntry", **c, fieldbackground="#12121e", insertcolor=FG,
@@ -121,56 +128,94 @@ def apply_dark_theme(root):
     s.map("TButton", background=[("active", "#3a3a54")])
     s.configure("TProgressbar", troughcolor=APP_BG, background=ACCENT,
                 bordercolor=BORDER, lightcolor=ACCENT, darkcolor=ACCENT_DARK)
-    s.configure("Treeview", background="#12121e", foreground=FG, fieldbackground="#12121e",
-                bordercolor=BORDER, rowheight=24)
-    s.configure("Treeview.Heading", background=PANEL_BG, foreground=ACCENT,
-                font=("Helvetica", 10, "bold"))
-    s.map("Treeview", background=[("selected", ACCENT_DARK)], foreground=[("selected", "#fff")])
     return s
 
 def _lbl(parent, text, row, col, **kw):
     l = ttk.Label(parent, text=text); l.grid(row=row, column=col, sticky="w", **kw); return l
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Scale-bar auto-detection (PIL only, no numpy)
+# Scale-bar detection with OCR
 # ─────────────────────────────────────────────────────────────────────────────
-def detect_scale_bar_px(img_path: Path) -> int | None:
-    """Try to find the pixel length of a scale bar in the bottom-right corner."""
+def read_scale_bar(img_path: Path) -> tuple[int | None, float | None, str]:
+    """
+    Analyse the bottom-right corner of an image.
+    Returns (bar_px, physical_value, unit_string).
+    bar_px        – pixel length of the detected horizontal bar (or None)
+    physical_value – numeric value read from the label below the bar (or None)
+    unit_string    – unit string, e.g. 'mm', 'µm', 'um', 'nm'  (or '')
+    """
     if not PIL_AVAILABLE:
-        return None
+        return None, None, ""
+
     try:
         img = Image.open(img_path).convert("L")
         w, h = img.size
-        # Crop bottom-right 30% x 15%
-        cx = int(w * 0.70); cy = int(h * 0.85)
-        crop = img.crop((cx, cy, w, h))
-        cw, ch = crop.size
-        # Binarize: pixels brighter than 200 OR darker than 55 are "bar candidates"
-        pixels = crop.load()
-        # Scan each row looking for long unbroken bright or dark runs
-        best_run = 0
-        for y in range(ch):
-            # Look for white run (bright scale bar on dark bg)
-            run = 0; max_run = 0
-            for x in range(cw):
-                v = pixels[x, y]
-                if v > 200:
-                    run += 1; max_run = max(max_run, run)
-                else:
-                    run = 0
-            best_run = max(best_run, max_run)
-            # Look for dark run (dark bar on bright bg)
-            run = 0
-            for x in range(cw):
-                v = pixels[x, y]
-                if v < 55:
-                    run += 1; max_run = max(max_run, run)
-                else:
-                    run = 0
-            best_run = max(best_run, max_run)
-        return best_run if best_run > 10 else None
+
+        # ── 1. Detect bar pixel length ──────────────────────────────────────
+        # Crop bottom-right 35% × 20%
+        cx = int(w * 0.65); cy = int(h * 0.80)
+        bar_crop = img.crop((cx, cy, w, h))
+        bcw, bch = bar_crop.size
+        pixels = bar_crop.load()
+
+        best_run = 0; best_row = 0
+        for y in range(bch):
+            for threshold, bright in [(200, True), (55, False)]:
+                run = mx = 0
+                for x in range(bcw):
+                    v = pixels[x, y]
+                    hit = v > threshold if bright else v < threshold
+                    if hit:
+                        run += 1; mx = max(mx, run)
+                    else:
+                        run = 0
+                if mx > best_run:
+                    best_run = mx; best_row = y
+        bar_px = best_run if best_run > 10 else None
+
+        # ── 2. OCR the label below the bar ──────────────────────────────────
+        physical_value: float | None = None
+        unit_str = ""
+
+        if OCR_AVAILABLE and bar_px is not None:
+            # Crop a band below the bar line (next ~15% of the crop height)
+            label_y0 = best_row + 2
+            label_y1 = min(bch, best_row + max(20, int(bch * 0.25)))
+            label_crop = bar_crop.crop((0, label_y0, bcw, label_y1))
+
+            # Pre-process for OCR: upscale + enhance contrast
+            scale_factor = max(1, int(60 / label_crop.height)) + 2
+            lw = label_crop.width * scale_factor
+            lh = label_crop.height * scale_factor
+            label_up = label_crop.resize((lw, lh), Image.LANCZOS)
+            label_up = ImageEnhance.Contrast(label_up).enhance(3.0)
+            # Invert if text is white on dark
+            mean_brightness = sum(label_up.getdata()) / (lw * lh)
+            if mean_brightness < 128:
+                label_up = ImageOps.invert(label_up)
+
+            try:
+                raw = pytesseract.image_to_string(
+                    label_up,
+                    config="--psm 7 -c tessedit_char_whitelist=0123456789.µumnpkMG "
+                )
+                raw = raw.strip()
+                # Parse "100 um", "0.5 mm", "500nm", "2.3µm" etc.
+                m = re.search(r"([\d]+(?:[.,]\d+)?)\s*([µu]m|nm|mm|cm|pm|km)", raw, re.IGNORECASE)
+                if m:
+                    physical_value = float(m.group(1).replace(",", "."))
+                    unit_str = m.group(2).strip()
+                    # Normalise 'um' -> 'µm'
+                    if unit_str.lower() == "um":
+                        unit_str = "µm"
+            except Exception:
+                pass
+
+        return bar_px, physical_value, unit_str
+
     except Exception:
-        return None
+        return None, None, ""
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main application
@@ -179,24 +224,24 @@ class PortalBatchApp:
     def __init__(self, root):
         self.root = root
         root.title("RustOrBust  —  Batch Rust Inference")
-        root.geometry("1100x800"); root.minsize(900, 650)
+        root.geometry("1200x820"); root.minsize(950, 650)
         self.repo_root = Path(__file__).resolve().parent
         self.remote_script_path = self.repo_root / "remote_batch_infer.py"
         self.model_candidates = discover_model_candidates(self.repo_root)
         dm = str(self.model_candidates[0]) if self.model_candidates else ""
+        # Job vars
         self.username_var = StringVar(); self.password_var = StringVar()
         self.image_dir_var = StringVar(value=str(Path.home()/"Downloads"))
         self.model_var = StringVar(value=dm)
         self.local_results_var = StringVar(value=str(self.repo_root/"results"))
         self.remote_workspace_var = StringVar(value="/u/{username}/rustorbustyolo_jobs")
         self.job_name_var = StringVar(value="rust_batch")
-        self.partition_var = StringVar(value="gpu")
-        self.walltime_var = StringVar(value="02:00:00"); self.cpus_var = StringVar(value="4")
-        self.memory_var = StringVar(value="16G"); self.gpus_var = StringVar(value="1")
-        self.image_size_var = StringVar(value="640"); self.confidence_var = StringVar(value="0.25")
-        self.bootstrap_var = BooleanVar(value=True); self.status_var = StringVar(value="Ready")
-        self.progress_var = IntVar(value=0)
-        # Analysis tab state
+        self.partition_var = StringVar(value="gpu"); self.walltime_var = StringVar(value="02:00:00")
+        self.cpus_var = StringVar(value="4"); self.memory_var = StringVar(value="16G")
+        self.gpus_var = StringVar(value="1"); self.image_size_var = StringVar(value="640")
+        self.confidence_var = StringVar(value="0.25"); self.bootstrap_var = BooleanVar(value=True)
+        self.status_var = StringVar(value="Ready"); self.progress_var = IntVar(value=0)
+        # Analysis vars
         self.analysis_folder_var = StringVar()
         self.scale_bar_px_var = StringVar(value="")
         self.scale_bar_unit_var = StringVar(value="")
@@ -204,15 +249,23 @@ class PortalBatchApp:
         self._analysis_images: list[Path] = []
         self._analysis_summary: dict = {}
         self._analysis_current_path: Path | None = None
+        self._analysis_pil_img: "Image.Image | None" = None
         self._analysis_photo = None
         self._analysis_zoom = 1.0
         # Widgets
         self.submit_button = self.test_conn_button = self.log_widget = None
         self.progress_bar = self.progress_label = self.status_label = None
         self.log_queue = Queue(); self._last_result_dir = None; self._thumbnail_refs = []
+        # Bind scale vars to refresh stats on change
+        for v in (self.scale_bar_px_var, self.scale_bar_unit_var, self.scale_unit_label_var):
+            v.trace_add("write", lambda *_: self._analysis_refresh_stats_if_open())
         apply_dark_theme(root); self._build_ui(); root.after(120, self._drain_log_queue)
 
-    # ── UI ────────────────────────────────────────────────────────────────────
+    def _analysis_refresh_stats_if_open(self):
+        if self._analysis_current_path:
+            self.root.after(0, lambda: self._analysis_update_stats(self._analysis_current_path))
+
+    # ── UI shell ──────────────────────────────────────────────────────────────
     def _build_ui(self):
         outer = ttk.Frame(self.root); outer.pack(fill="both", expand=True)
         hdr = ttk.Frame(outer); hdr.configure(style="Card.TFrame"); hdr.pack(fill="x")
@@ -242,7 +295,7 @@ class PortalBatchApp:
     def _build_connect_tab(self, p):
         p.columnconfigure(0, weight=1)
         cr = ttk.LabelFrame(p, text="Portal Credentials", padding=16)
-        cr.grid(row=0, column=0, sticky="ew", pady=(0, 16)); cr.columnconfigure(1, weight=1)
+        cr.grid(row=0, column=0, sticky="ew", pady=(0,16)); cr.columnconfigure(1, weight=1)
         _lbl(cr, "Username", 0, 0)
         ttk.Entry(cr, textvariable=self.username_var, width=30).grid(row=0, column=1, sticky="ew", padx=(10,0))
         _lbl(cr, "Password", 1, 0, pady=(10,0))
@@ -332,41 +385,36 @@ class PortalBatchApp:
 
     # ── Analysis tab ──────────────────────────────────────────────────────────
     def _build_analysis_tab(self, p):
-        p.columnconfigure(0, weight=0)   # left panel fixed
-        p.columnconfigure(1, weight=1)   # right panel expands
+        # Three columns: image list | viewer | stats
+        p.columnconfigure(0, weight=0, minsize=180)   # image list
+        p.columnconfigure(1, weight=3)                 # image viewer
+        p.columnconfigure(2, weight=0, minsize=280)   # stats panel
         p.rowconfigure(0, weight=1)
 
-        # ── Left panel: folder loader + image list ────────────────────────────
+        # ── Column 0: image list ──────────────────────────────────────────────
         left = ttk.Frame(p, style="Card.TFrame")
-        left.grid(row=0, column=0, sticky="nsew", padx=(8,4), pady=8)
-        left.rowconfigure(2, weight=1); left.columnconfigure(0, weight=1)
+        left.grid(row=0, column=0, sticky="nsew", padx=(8,2), pady=8)
+        left.rowconfigure(3, weight=1); left.columnconfigure(0, weight=1)
 
-        top_left = ttk.Frame(left, style="Card.TFrame")
-        top_left.grid(row=0, column=0, sticky="ew", padx=8, pady=(8,4))
-        ttk.Label(top_left, text="Results Folder", style="Card.TLabel",
-                  font=("Helvetica", 11, "bold")).pack(anchor="w")
-        path_row = ttk.Frame(top_left, style="Card.TFrame")
-        path_row.pack(fill="x", pady=(4,0))
-        ttk.Entry(path_row, textvariable=self.analysis_folder_var, width=22).pack(side="left", fill="x", expand=True)
-        ttk.Button(path_row, text="...", width=3,
-                   command=self._analysis_choose_folder).pack(side="left", padx=(4,0))
-        ttk.Button(top_left, text="Load Images", command=self._analysis_load_folder
-                   ).pack(fill="x", pady=(6,0))
+        ttk.Label(left, text="Results Folder", style="Card.TLabel",
+                  font=("Helvetica", 11, "bold")).grid(row=0, column=0, columnspan=2, sticky="w", padx=8, pady=(8,4))
+        path_row = ttk.Frame(left, style="Card.TFrame")
+        path_row.grid(row=1, column=0, columnspan=2, sticky="ew", padx=8)
+        ttk.Entry(path_row, textvariable=self.analysis_folder_var).pack(side="left", fill="x", expand=True)
+        ttk.Button(path_row, text="...", width=3, command=self._analysis_choose_folder).pack(side="left", padx=(4,0))
+        ttk.Button(left, text="Load Images", command=self._analysis_load_folder
+                   ).grid(row=2, column=0, columnspan=2, sticky="ew", padx=8, pady=(4,6))
 
-        ttk.Separator(left, orient="horizontal").grid(row=1, column=0, sticky="ew", pady=4)
+        ttk.Separator(left, orient="horizontal").grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0,4))
 
-        # Image list box
         list_frame = ttk.Frame(left, style="Card.TFrame")
-        list_frame.grid(row=2, column=0, sticky="nsew", padx=4, pady=(0,8))
+        list_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", padx=4, pady=(0,8))
         list_frame.rowconfigure(0, weight=1); list_frame.columnconfigure(0, weight=1)
-        self.analysis_listbox_var = StringVar()
-        from tkinter import Listbox, SINGLE, END
-        self._Listbox = Listbox  # store ref for later
         self.analysis_listbox = Listbox(
             list_frame, selectmode=SINGLE, bg="#12121e", fg=FG,
             selectbackground=ACCENT, selectforeground="#fff",
             font=("Helvetica", 10), relief="flat", borderwidth=0,
-            activestyle="none", width=26,
+            activestyle="none", width=22,
         )
         lb_vsb = ttk.Scrollbar(list_frame, orient="vertical", command=self.analysis_listbox.yview)
         self.analysis_listbox.configure(yscrollcommand=lb_vsb.set)
@@ -374,35 +422,28 @@ class PortalBatchApp:
         lb_vsb.grid(row=0, column=1, sticky="ns")
         self.analysis_listbox.bind("<<ListboxSelect>>", self._analysis_on_select)
 
-        # ── Right panel: viewer + stats ───────────────────────────────────────
-        right = ttk.Frame(p, style="Card.TFrame")
-        right.grid(row=0, column=1, sticky="nsew", padx=(4,8), pady=8)
-        right.rowconfigure(1, weight=1); right.columnconfigure(0, weight=1)
+        # ── Column 1: image viewer ────────────────────────────────────────────
+        mid = ttk.Frame(p, style="Card.TFrame")
+        mid.grid(row=0, column=1, sticky="nsew", padx=2, pady=8)
+        mid.rowconfigure(1, weight=1); mid.columnconfigure(0, weight=1)
 
-        # Scale bar row
-        scale_frame = ttk.LabelFrame(right, text="Scale Calibration", padding=10)
-        scale_frame.grid(row=0, column=0, sticky="ew", padx=8, pady=(8,4))
-        scale_frame.columnconfigure(1, weight=0)
+        # Scale bar row (above image)
+        scale_frame = ttk.Frame(mid, style="Card.TFrame")
+        scale_frame.grid(row=0, column=0, sticky="ew", padx=6, pady=(6,4))
+        ttk.Label(scale_frame, text="Scale bar:", style="Dim.TLabel").pack(side="left")
+        ttk.Entry(scale_frame, textvariable=self.scale_bar_px_var, width=6).pack(side="left", padx=(4,2))
+        ttk.Label(scale_frame, text="px =", style="Dim.TLabel").pack(side="left")
+        ttk.Entry(scale_frame, textvariable=self.scale_bar_unit_var, width=6).pack(side="left", padx=(4,2))
+        ttk.Entry(scale_frame, textvariable=self.scale_unit_label_var, width=4).pack(side="left", padx=(0,8))
+        self._scale_status_label = ttk.Label(scale_frame, text="", style="Dim.TLabel",
+                                              font=("Helvetica", 10, "italic"))
+        self._scale_status_label.pack(side="left")
+        ttk.Button(scale_frame, text="Read scale from image",
+                   command=self._analysis_read_scale).pack(side="right", padx=(8,4))
 
-        ttk.Label(scale_frame, text="Scale bar length (px):").grid(row=0, column=0, sticky="w")
-        self._scale_bar_px_entry = ttk.Entry(scale_frame, textvariable=self.scale_bar_px_var, width=8)
-        self._scale_bar_px_entry.grid(row=0, column=1, padx=(6,12))
-        ttk.Label(scale_frame, text="represents:").grid(row=0, column=2, sticky="w")
-        self._scale_bar_unit_entry = ttk.Entry(scale_frame, textvariable=self.scale_bar_unit_var, width=6)
-        self._scale_bar_unit_entry.grid(row=0, column=3, padx=(6,6))
-        ttk.Entry(scale_frame, textvariable=self.scale_unit_label_var, width=5).grid(row=0, column=4)
-        ttk.Button(scale_frame, text="Auto-detect bar",
-                   command=self._analysis_auto_detect_scale).grid(row=0, column=5, padx=(12,0))
-        ttk.Label(scale_frame,
-                  text="Read the scale bar from the image corner, enter its pixel length and physical size.",
-                  style="Dim.TLabel").grid(row=1, column=0, columnspan=6, sticky="w", pady=(4,0))
-
-        # Image + stats in a paned window
-        paned = ttk.PanedWindow(right, orient="vertical")
-        paned.grid(row=1, column=0, sticky="nsew", padx=8, pady=(4,8))
-
-        # Image viewer canvas
-        viewer_frame = ttk.Frame(paned, style="Card.TFrame")
+        # Canvas
+        viewer_frame = ttk.Frame(mid, style="Card.TFrame")
+        viewer_frame.grid(row=1, column=0, sticky="nsew")
         viewer_frame.rowconfigure(0, weight=1); viewer_frame.columnconfigure(0, weight=1)
         self.analysis_canvas = Canvas(viewer_frame, bg="#0d0d1a", highlightthickness=0, cursor="crosshair")
         av_vsb = ttk.Scrollbar(viewer_frame, orient="vertical", command=self.analysis_canvas.yview)
@@ -411,11 +452,10 @@ class PortalBatchApp:
         self.analysis_canvas.grid(row=0, column=0, sticky="nsew")
         av_vsb.grid(row=0, column=1, sticky="ns")
         av_hsb.grid(row=1, column=0, sticky="ew")
-        # Zoom controls
         zoom_bar = ttk.Frame(viewer_frame, style="Card.TFrame")
         zoom_bar.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(2,0))
-        ttk.Button(zoom_bar, text="  +  ", command=lambda: self._analysis_zoom_step(1.25)).pack(side="left", padx=2)
-        ttk.Button(zoom_bar, text="  -  ", command=lambda: self._analysis_zoom_step(0.8)).pack(side="left", padx=2)
+        ttk.Button(zoom_bar, text=" + ", command=lambda: self._analysis_zoom_step(1.25)).pack(side="left", padx=2)
+        ttk.Button(zoom_bar, text=" - ", command=lambda: self._analysis_zoom_step(0.8)).pack(side="left", padx=2)
         ttk.Button(zoom_bar, text="Fit", command=self._analysis_zoom_fit).pack(side="left", padx=2)
         self.analysis_zoom_label = ttk.Label(zoom_bar, text="100%", style="Dim.TLabel")
         self.analysis_zoom_label.pack(side="left", padx=8)
@@ -425,26 +465,68 @@ class PortalBatchApp:
         self.analysis_canvas.bind("<MouseWheel>", self._analysis_on_scroll)
         self.analysis_canvas.bind("<Button-4>", self._analysis_on_scroll)
         self.analysis_canvas.bind("<Button-5>", self._analysis_on_scroll)
-        paned.add(viewer_frame, weight=3)
 
-        # Stats panel
-        stats_outer = ttk.Frame(paned, style="Card.TFrame")
-        stats_outer.rowconfigure(0, weight=1); stats_outer.columnconfigure(0, weight=1)
-        stats_canvas = Canvas(stats_outer, bg=PANEL_BG, highlightthickness=0, height=200)
-        stats_vsb = ttk.Scrollbar(stats_outer, orient="vertical", command=stats_canvas.yview)
+        # ── Column 2: stats panel (always visible) ───────────────────────────
+        right = ttk.Frame(p, style="Card.TFrame")
+        right.grid(row=0, column=2, sticky="nsew", padx=(2,8), pady=8)
+        right.rowconfigure(1, weight=1); right.columnconfigure(0, weight=1)
+
+        ttk.Label(right, text="Statistics", style="Card.TLabel",
+                  font=("Helvetica", 13, "bold")).grid(row=0, column=0, sticky="w", padx=12, pady=(10,6))
+
+        stats_canvas = Canvas(right, bg=PANEL_BG, highlightthickness=0)
+        stats_vsb = ttk.Scrollbar(right, orient="vertical", command=stats_canvas.yview)
         stats_canvas.configure(yscrollcommand=stats_vsb.set)
-        stats_canvas.grid(row=0, column=0, sticky="nsew")
-        stats_vsb.grid(row=0, column=1, sticky="ns")
+        stats_canvas.grid(row=1, column=0, sticky="nsew")
+        stats_vsb.grid(row=1, column=1, sticky="ns")
         self.stats_inner = ttk.Frame(stats_canvas, style="Card.TFrame")
-        self.stats_canvas_win = stats_canvas.create_window((0,0), window=self.stats_inner, anchor="nw")
-        self.stats_inner.bind("<Configure>", lambda e: stats_canvas.configure(scrollregion=stats_canvas.bbox("all")))
-        stats_canvas.bind("<Configure>", lambda e: stats_canvas.itemconfig(self.stats_canvas_win, width=e.width))
-        paned.add(stats_outer, weight=2)
+        self._stats_win = stats_canvas.create_window((0,0), window=self.stats_inner, anchor="nw")
+        self.stats_inner.bind("<Configure>",
+            lambda e: stats_canvas.configure(scrollregion=stats_canvas.bbox("all")))
+        stats_canvas.bind("<Configure>",
+            lambda e: stats_canvas.itemconfig(self._stats_win, width=e.width))
 
-        ttk.Label(self.stats_inner, text="Select an image to view statistics.",
-                  style="Dim.TLabel").pack(anchor="w", padx=12, pady=12)
+        ttk.Label(self.stats_inner,
+                  text="Select an image from the list\nto view its statistics here.",
+                  style="Dim.TLabel", justify="left"
+                  ).pack(anchor="w", padx=12, pady=12)
 
-    # ── Analysis: folder / load ───────────────────────────────────────────────
+    # ── Scale reading ─────────────────────────────────────────────────────────
+    def _analysis_read_scale(self):
+        path = self._analysis_current_path
+        if path is None:
+            messagebox.showinfo("No Image", "Load and select an image first.")
+            return
+
+        self._scale_status_label.configure(text="Reading...")
+        self.root.update_idletasks()
+
+        def _run():
+            bar_px, phys_val, unit_str = read_scale_bar(path)
+            return bar_px, phys_val, unit_str
+
+        def _done(bar_px, phys_val, unit_str):
+            msgs = []
+            if bar_px:
+                self.scale_bar_px_var.set(str(bar_px))
+                msgs.append(f"bar = {bar_px} px")
+            else:
+                msgs.append("bar not detected")
+            if phys_val is not None and unit_str:
+                self.scale_bar_unit_var.set(str(phys_val))
+                self.scale_unit_label_var.set(unit_str)
+                msgs.append(f"label = {phys_val} {unit_str}")
+            elif not OCR_AVAILABLE:
+                msgs.append("OCR unavailable (install pytesseract)")
+            else:
+                msgs.append("label not read — enter manually")
+            self._scale_status_label.configure(text="  |  ".join(msgs))
+            self._analysis_update_stats(path)
+
+        bar_px, phys_val, unit_str = _run()
+        _done(bar_px, phys_val, unit_str)
+
+    # ── Image list ────────────────────────────────────────────────────────────
     def _analysis_choose_folder(self):
         initial = self.analysis_folder_var.get() or (
             str(self._last_result_dir) if self._last_result_dir else str(Path.home()))
@@ -454,37 +536,30 @@ class PortalBatchApp:
     def _analysis_load_folder(self):
         folder = Path(self.analysis_folder_var.get())
         if not folder.is_dir():
-            # Try last result dir
             if self._last_result_dir and self._last_result_dir.is_dir():
                 folder = self._last_result_dir / "annotated_images"
                 self.analysis_folder_var.set(str(folder))
             else:
-                messagebox.showwarning("No Folder", "Select a results folder first."); return
-
-        # Find annotated images (recurse one level)
+                messagebox.showwarning("No Folder", "Select a results folder first.")
+                return
         images = sorted(p for p in folder.rglob("*")
                         if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES)
         if not images:
-            messagebox.showinfo("No Images", f"No images found in {folder}"); return
-
+            messagebox.showinfo("No Images", f"No images found in {folder}")
+            return
         self._analysis_images = images
         self._analysis_summary = self._load_summary_json(folder)
-
         self.analysis_listbox.delete(0, "end")
         for p in images:
-            self.analysis_listbox.insert("end", p.name)
-
-        # Auto-select first
+            self.analysis_listbox.insert("end", "  " + p.name)
         self.analysis_listbox.selection_set(0)
         self._analysis_on_select(None)
 
     def _load_summary_json(self, folder: Path) -> dict:
-        """Walk up looking for summary.json."""
         candidates = list(folder.rglob("summary.json")) + list(folder.parent.rglob("summary.json"))
         for c in candidates:
             try:
                 data = json.loads(c.read_text(encoding="utf-8"))
-                # Index by image name
                 return {row["image"]: row for row in data.get("rows", [])}
             except Exception:
                 pass
@@ -492,10 +567,8 @@ class PortalBatchApp:
 
     def _analysis_on_select(self, _event):
         sel = self.analysis_listbox.curselection()
-        if not sel: return
-        idx = sel[0]
-        if idx >= len(self._analysis_images): return
-        path = self._analysis_images[idx]
+        if not sel or sel[0] >= len(self._analysis_images): return
+        path = self._analysis_images[sel[0]]
         self._analysis_current_path = path
         self._analysis_zoom = 1.0
         self._analysis_show_image(path)
@@ -516,39 +589,35 @@ class PortalBatchApp:
             self.analysis_canvas.create_text(10, 10, anchor="nw", text=str(e), fill=LOG_COLORS["error"])
 
     def _analysis_render_image(self):
-        if not hasattr(self, "_analysis_pil_img") or self._analysis_pil_img is None: return
+        if not self._analysis_pil_img: return
         img = self._analysis_pil_img
-        w = int(img.width * self._analysis_zoom)
-        h = int(img.height * self._analysis_zoom)
+        w = max(1, int(img.width  * self._analysis_zoom))
+        h = max(1, int(img.height * self._analysis_zoom))
         resized = img.resize((w, h), Image.LANCZOS if self._analysis_zoom < 1 else Image.NEAREST)
         self._analysis_photo = ImageTk.PhotoImage(resized)
         self.analysis_canvas.delete("all")
         self.analysis_canvas.create_image(0, 0, anchor="nw", image=self._analysis_photo)
         self.analysis_canvas.configure(scrollregion=(0, 0, w, h))
-        pct = int(self._analysis_zoom * 100)
-        self.analysis_zoom_label.configure(text=f"{pct}%")
+        self.analysis_zoom_label.configure(text=f"{int(self._analysis_zoom*100)}%")
 
-    def _analysis_zoom_step(self, factor: float):
-        self._analysis_zoom = max(0.05, min(8.0, self._analysis_zoom * factor))
+    def _analysis_zoom_step(self, f: float):
+        self._analysis_zoom = max(0.05, min(8.0, self._analysis_zoom * f))
         self._analysis_render_image()
 
     def _analysis_zoom_fit(self):
-        if not hasattr(self, "_analysis_pil_img") or self._analysis_pil_img is None: return
+        if not self._analysis_pil_img: return
         cw = self.analysis_canvas.winfo_width() or 400
         ch = self.analysis_canvas.winfo_height() or 300
         iw, ih = self._analysis_pil_img.size
-        self._analysis_zoom = min(cw / iw, ch / ih, 1.0)
+        self._analysis_zoom = min(cw/iw, ch/ih, 1.0)
         self._analysis_render_image()
 
     def _analysis_on_scroll(self, event):
-        if event.num == 4 or (hasattr(event, "delta") and event.delta > 0):
-            self._analysis_zoom_step(1.15)
-        else:
-            self._analysis_zoom_step(1/1.15)
+        up = event.num == 4 or (hasattr(event, "delta") and event.delta > 0)
+        self._analysis_zoom_step(1.15 if up else 1/1.15)
 
     def _analysis_on_mouse_move(self, event):
-        if not hasattr(self, "_analysis_pil_img") or self._analysis_pil_img is None: return
-        # Canvas coordinates -> image coordinates
+        if not self._analysis_pil_img: return
         cx = self.analysis_canvas.canvasx(event.x)
         cy = self.analysis_canvas.canvasy(event.y)
         ix = int(cx / self._analysis_zoom); iy = int(cy / self._analysis_zoom)
@@ -558,121 +627,93 @@ class PortalBatchApp:
         else:
             self.analysis_pos_label.configure(text="")
 
-    # ── Scale bar auto-detect ─────────────────────────────────────────────────
-    def _analysis_auto_detect_scale(self):
-        path = self._analysis_current_path
-        if path is None:
-            messagebox.showinfo("No Image", "Load and select an image first."); return
-        bar_px = detect_scale_bar_px(path)
-        if bar_px and bar_px > 0:
-            self.scale_bar_px_var.set(str(bar_px))
-            messagebox.showinfo("Scale Bar Detected",
-                                f"Detected a horizontal bar of ~{bar_px} px in the bottom-right corner.\n"
-                                f"Enter the physical length it represents (e.g. 1 mm) in the field to the right.")
-        else:
-            messagebox.showinfo("Not Detected",
-                                "Could not auto-detect a scale bar. Please enter the pixel length manually.")
-        self._analysis_update_stats(path)
-
     # ── Statistics panel ──────────────────────────────────────────────────────
     def _analysis_update_stats(self, path: Path):
         for w in self.stats_inner.winfo_children(): w.destroy()
 
         row_data = self._analysis_summary.get(path.name, {})
-        has_data = bool(row_data)
 
-        # Scale factor
         scale_px_s  = self.scale_bar_px_var.get().strip()
         scale_len_s = self.scale_bar_unit_var.get().strip()
         unit_label  = self.scale_unit_label_var.get().strip() or "mm"
-        px_per_unit = None
+        px_per_unit: float | None = None
         if scale_px_s and scale_len_s:
-            try:
-                px_per_unit = float(scale_px_s) / float(scale_len_s)
-            except ValueError:
-                pass
-
-        def add_stat(label, value, row, highlight=False):
-            style = "StatVal.TLabel" if highlight else "Stat.TLabel"
-            ttk.Label(self.stats_inner, text=label+":", style="Stat.TLabel"
-                      ).grid(row=row, column=0, sticky="w", padx=(12,4), pady=2)
-            ttk.Label(self.stats_inner, text=str(value), style=style
-                      ).grid(row=row, column=1, sticky="w", padx=(0,12), pady=2)
+            try: px_per_unit = float(scale_px_s) / float(scale_len_s)
+            except ValueError: pass
 
         r = 0
-        ttk.Label(self.stats_inner, text=f"  {path.name}",
-                  style="Card.TLabel", font=("Helvetica", 11, "bold")
-                  ).grid(row=r, column=0, columnspan=2, sticky="w", pady=(10,6), padx=8)
+        def row_lbl(label, value, highlight=False):
+            nonlocal r
+            ttk.Label(self.stats_inner, text=label,
+                      style="StatHead.TLabel"
+                      ).grid(row=r, column=0, sticky="nw", padx=(12,4), pady=3)
+            val_style = "StatVal.TLabel" if highlight else "Stat.TLabel"
+            ttk.Label(self.stats_inner, text=str(value), style=val_style,
+                      wraplength=160, justify="left"
+                      ).grid(row=r, column=1, sticky="nw", padx=(0,12), pady=3)
+            r += 1
+
+        def sep():
+            nonlocal r
+            ttk.Separator(self.stats_inner, orient="horizontal").grid(
+                row=r, column=0, columnspan=2, sticky="ew", padx=8, pady=4)
+            r += 1
+
+        ttk.Label(self.stats_inner, text=path.name,
+                  style="Card.TLabel", font=("Helvetica", 10, "bold"),
+                  wraplength=240, justify="left"
+                  ).grid(row=r, column=0, columnspan=2, sticky="w", padx=12, pady=(10,6))
         r += 1
 
-        if has_data:
+        if row_data:
             iw = row_data.get("image_width_px", "?")
             ih = row_data.get("image_height_px", "?")
-            add_stat("Image size", f"{iw} × {ih} px", r); r+=1
-            add_stat("Detections", row_data.get("detections", "?"), r, True); r+=1
-            add_stat("Max confidence", row_data.get("max_confidence", "?"), r); r+=1
-            add_stat("Avg confidence", row_data.get("avg_confidence", "?"), r); r+=1
+            row_lbl("Image size",   f"{iw} × {ih} px")
+            row_lbl("Detections",   row_data.get("detections", "?"), highlight=True)
+            row_lbl("Max conf",     row_data.get("max_confidence", "—"))
+            row_lbl("Avg conf",     row_data.get("avg_confidence", "—"))
+            sep()
 
-            total_px = row_data.get("total_mask_area_px", None)
-            cov = row_data.get("coverage_pct", None)
+            total_px = row_data.get("total_mask_area_px")
+            cov      = row_data.get("coverage_pct")
             if total_px is not None:
-                add_stat("Total rust area", f"{total_px:,} px²", r, True); r+=1
+                row_lbl("Rust area",    f"{total_px:,} px²", highlight=True)
                 if px_per_unit is not None:
                     real_area = total_px / (px_per_unit ** 2)
-                    add_stat(f"Real area", f"{real_area:.4f} {unit_label}²", r, True); r+=1
+                    row_lbl(f"Rust area ({unit_label}²)", f"{real_area:.4f} {unit_label}²", highlight=True)
                 if cov is not None:
-                    add_stat("Surface coverage", f"{cov:.2f}%", r, True); r+=1
+                    row_lbl("Coverage",  f"{cov:.2f}%", highlight=True)
+                sep()
 
-            # Per-detection breakdown
             areas = row_data.get("mask_areas_px", [])
             confs = row_data.get("confidences", [])
             if areas:
-                ttk.Separator(self.stats_inner, orient="horizontal").grid(
-                    row=r, column=0, columnspan=2, sticky="ew", pady=6, padx=8); r+=1
-                ttk.Label(self.stats_inner, text="  Per-detection breakdown",
-                          style="Card.TLabel", font=("Helvetica", 10, "bold")
-                          ).grid(row=r, column=0, columnspan=2, sticky="w", padx=8); r+=1
-
-                # Table header
-                for col, hdr in enumerate(["#", "Area (px²)", f"Area ({unit_label}²)" if px_per_unit else "Area (px²)", "Confidence"]):
-                    ttk.Label(self.stats_inner, text=hdr, style="Dim.TLabel",
-                              font=("Helvetica", 9, "bold")
-                              ).grid(row=r, column=col if col < 2 else col-1 if col==2 else col-1,
-                                     sticky="w", padx=(12 if col==0 else 4, 4), pady=(0,2))
-                # Adjusted: use columns 0-3 for the 4 cols
-                for ci, (c0,c1,c2,c3) in enumerate([("#","Area (px²)",
-                    f"Area ({unit_label}²)" if px_per_unit else "Real area",
-                    "Confidence")]):
-                    ttk.Label(self.stats_inner, text=c0, style="Dim.TLabel",
-                              font=("Helvetica", 9, "bold")).grid(row=r, column=0, sticky="w", padx=(12,4))
-                    ttk.Label(self.stats_inner, text=c1, style="Dim.TLabel",
-                              font=("Helvetica", 9, "bold")).grid(row=r, column=1, sticky="w", padx=4)
-                    ttk.Label(self.stats_inner, text=c2, style="Dim.TLabel",
-                              font=("Helvetica", 9, "bold")).grid(row=r, column=2, sticky="w", padx=4)
-                    ttk.Label(self.stats_inner, text=c3, style="Dim.TLabel",
-                              font=("Helvetica", 9, "bold")).grid(row=r, column=3, sticky="w", padx=4)
+                ttk.Label(self.stats_inner, text="Per-detection",
+                          style="StatHead.TLabel", font=("Helvetica", 10, "bold")
+                          ).grid(row=r, column=0, columnspan=2, sticky="w", padx=12, pady=(2,4))
                 r += 1
                 for i, area in enumerate(areas):
                     conf = f"{confs[i]:.3f}" if i < len(confs) else "—"
-                    real = f"{area/(px_per_unit**2):.4f}" if px_per_unit else "—"
-                    bg_style = "Stat.TLabel"
-                    ttk.Label(self.stats_inner, text=str(i+1), style=bg_style).grid(row=r, column=0, sticky="w", padx=(12,4), pady=1)
-                    ttk.Label(self.stats_inner, text=f"{area:,}", style=bg_style).grid(row=r, column=1, sticky="w", padx=4, pady=1)
-                    ttk.Label(self.stats_inner, text=real, style="StatVal.TLabel").grid(row=r, column=2, sticky="w", padx=4, pady=1)
-                    ttk.Label(self.stats_inner, text=conf, style=bg_style).grid(row=r, column=3, sticky="w", padx=4, pady=1)
+                    real = (f"{area/(px_per_unit**2):.4f} {unit_label}²"
+                            if px_per_unit else f"{area:,} px²")
+                    ttk.Label(self.stats_inner,
+                              text=f"#{i+1}",
+                              style="Dim.TLabel").grid(row=r, column=0, sticky="w", padx=(12,4), pady=1)
+                    ttk.Label(self.stats_inner,
+                              text=f"{real}  conf {conf}",
+                              style="StatVal.TLabel"
+                              ).grid(row=r, column=1, sticky="w", padx=(0,12), pady=1)
                     r += 1
         else:
             ttk.Label(self.stats_inner,
-                      text="No summary data found for this image.\n"
-                           "Run a job first, or load a folder that contains summary.json.",
-                      style="Dim.TLabel").grid(row=r, column=0, columnspan=2, sticky="w", padx=12, pady=8)
+                      text="No summary.json found.\nRun a job first, or load a\nfolder containing summary.json.",
+                      style="Dim.TLabel", justify="left"
+                      ).grid(row=r, column=0, columnspan=2, sticky="w", padx=12, pady=8)
             r += 1
-            # Still show scale info if available
             if PIL_AVAILABLE:
                 try:
                     img = Image.open(path)
-                    iw, ih = img.size
-                    add_stat("Image size", f"{iw} × {ih} px", r); r+=1
+                    row_lbl("Image size", f"{img.width} × {img.height} px")
                 except Exception:
                     pass
 
@@ -703,8 +744,6 @@ class PortalBatchApp:
             ttk.Label(fr, text=ip.name[:24]+("..." if len(ip.name)>24 else ""),
                       style="Dim.TLabel", font=("Helvetica",9)).pack(pady=(2,0))
         self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all"))
-
-        # Also populate analysis tab
         if self._last_result_dir:
             adir = self._last_result_dir/"annotated_images"
             self.analysis_folder_var.set(str(adir))
@@ -779,7 +818,8 @@ class PortalBatchApp:
             self.status_var.set("Ready")
 
     def _enable_results_buttons(self):
-        self.open_folder_btn.configure(state="normal"); self.refresh_thumbs_btn.configure(state="normal")
+        self.open_folder_btn.configure(state="normal")
+        self.refresh_thumbs_btn.configure(state="normal")
 
     # ── Test connection ───────────────────────────────────────────────────────
     def _test_connection(self):
@@ -824,10 +864,13 @@ class PortalBatchApp:
         if not self.remote_script_path.is_file(): raise ValueError(f"remote_batch_infer.py missing: {self.remote_script_path}")
         if not rwr: raise ValueError("Remote workspace root is required.")
         lrr.mkdir(parents=True, exist_ok=True)
-        return SubmissionConfig(username=u, password=pw, image_dir=idir, model_path=mp, local_results_root=lrr,
-                                remote_workspace_root=rwr, job_name=jn, partition=self.partition_var.get().strip() or "gpu",
-                                walltime=self.walltime_var.get().strip() or "02:00:00", cpus=self.cpus_var.get().strip() or "4",
-                                memory=self.memory_var.get().strip() or "16G", gpus=self.gpus_var.get().strip() or "1",
+        return SubmissionConfig(username=u, password=pw, image_dir=idir, model_path=mp,
+                                local_results_root=lrr, remote_workspace_root=rwr, job_name=jn,
+                                partition=self.partition_var.get().strip() or "gpu",
+                                walltime=self.walltime_var.get().strip() or "02:00:00",
+                                cpus=self.cpus_var.get().strip() or "4",
+                                memory=self.memory_var.get().strip() or "16G",
+                                gpus=self.gpus_var.get().strip() or "1",
                                 image_size=self.image_size_var.get().strip() or "640",
                                 confidence=self.confidence_var.get().strip() or "0.25",
                                 bootstrap_env=self.bootstrap_var.get())
@@ -837,7 +880,8 @@ class PortalBatchApp:
         wr = expand_remote_path(cfg.remote_workspace_root, cfg.username)
         wd = f"{wr.rstrip('/')}/{cfg.job_name}_{ts}"
         rid = f"{wd}/input"; rod = f"{wd}/output"
-        rs = f"{wd}/remote_batch_infer.py"; rm = f"{wd}/{cfg.model_path.name}"; rsl = f"{wd}/submit_batch.slurm"
+        rs = f"{wd}/remote_batch_infer.py"; rm = f"{wd}/{cfg.model_path.name}"
+        rsl = f"{wd}/submit_batch.slurm"
         lrd = cfg.local_results_root / f"{cfg.job_name}_{ts}"
         images = list_images(cfg.image_dir)
         self._log("info", f"Found {len(images)} image(s)")
@@ -847,7 +891,6 @@ class PortalBatchApp:
             c.connect(hostname=SSH_HOST, username=cfg.username, password=cfg.password, look_for_keys=False,
                       allow_agent=False, timeout=20, banner_timeout=20, auth_timeout=20)
             self._log("success", "SSH connection established.")
-            self._log("status", "Creating remote directories ...")
             self._exec_checked(c, f"mkdir -p {shlex.quote(rid)} {shlex.quote(rod)}")
             self._log("info", f"Remote workspace: {wd}")
             with c.open_sftp() as sftp:
@@ -859,10 +902,11 @@ class PortalBatchApp:
                     self._upload_file(sftp, ip, f"{rid}/{ip.name}")
                 self.log_queue.put(("progress", f"{len(images)}/{len(images)} Uploading image"))
                 self._log("success", f"Uploaded {len(images)} image(s).")
-                ss = build_slurm_script(job_name=cfg.job_name, workspace_dir=wd, remote_script=rs, remote_model=rm,
-                                         remote_input_dir=rid, remote_output_dir=rod, partition=cfg.partition,
-                                         walltime=cfg.walltime, cpus=cfg.cpus, memory=cfg.memory, gpus=cfg.gpus,
-                                         image_size=cfg.image_size, confidence=cfg.confidence, bootstrap_env=cfg.bootstrap_env)
+                ss = build_slurm_script(job_name=cfg.job_name, workspace_dir=wd, remote_script=rs,
+                                         remote_model=rm, remote_input_dir=rid, remote_output_dir=rod,
+                                         partition=cfg.partition, walltime=cfg.walltime, cpus=cfg.cpus,
+                                         memory=cfg.memory, gpus=cfg.gpus, image_size=cfg.image_size,
+                                         confidence=cfg.confidence, bootstrap_env=cfg.bootstrap_env)
                 with sftp.file(rsl, "w") as fh: fh.write(ss)
             self._exec_checked(c, f"chmod 700 {shlex.quote(rs)} {shlex.quote(rsl)}")
             self._log("status", "Submitting Slurm job ...")
@@ -875,17 +919,20 @@ class PortalBatchApp:
             self._log("info", f"Job {jid} finished - state: {fs or 'UNKNOWN'}")
             with c.open_sftp() as sftp:
                 rrd = f"{rod}/results"
-                if not self._remote_exists(sftp, rrd): raise RuntimeError(f"Remote results dir not found: {rrd}\nCheck slurm-{jid}.err")
+                if not self._remote_exists(sftp, rrd):
+                    raise RuntimeError(f"Remote results dir not found: {rrd}\nCheck slurm-{jid}.err")
                 rfiles = self._list_remote_files(sftp, rrd); total = len(rfiles)
                 self._log("status", "Downloading results ..."); lrd.mkdir(parents=True, exist_ok=True)
                 la = lrd/"annotated_images"
                 for i, (rp, lp) in enumerate(self._iter_download_pairs(sftp, rrd, la), 1):
-                    self.log_queue.put(("progress", f"{i}/{total} Downloading")); self._download_file(sftp, rp, lp)
+                    self.log_queue.put(("progress", f"{i}/{total} Downloading"))
+                    self._download_file(sftp, rp, lp)
                 for ls in (f"slurm-{jid}.out", f"slurm-{jid}.err"):
                     rl = f"{wd}/{ls}"
                     if self._remote_exists(sftp, rl): self._download_file(sftp, rl, lrd/ls)
             (lrd/"remote_workspace.txt").write_text(
-                f"remote_workspace={wd}\nremote_output={rod}/results\njob_id={jid}\nstate={fs}\n", encoding="utf-8")
+                f"remote_workspace={wd}\nremote_output={rod}/results\njob_id={jid}\nstate={fs}\n",
+                encoding="utf-8")
             self._last_result_dir = lrd
             self.log_queue.put(("done", f"Results saved to {lrd/'annotated_images'}"))
         except Exception as e: self.log_queue.put(("error", str(e)))
@@ -896,7 +943,10 @@ class PortalBatchApp:
         while True:
             s = self._exec_quiet(c, f"{SQUEUE} -j {shlex.quote(jid)} -h -o %T").strip()
             if s:
-                if s != last: self._log("info", f"Job {jid}: {s}"); self.log_queue.put(("status", f"Job {jid}: {s}")); last = s
+                if s != last:
+                    self._log("info", f"Job {jid}: {s}")
+                    self.log_queue.put(("status", f"Job {jid}: {s}"))
+                    last = s
                 time.sleep(15); continue
             acc = self._exec_quiet(c, f"{SACCT} -j {shlex.quote(jid)} --format=State --noheader | head -n 1").strip()
             return acc.split()[0] if acc else last or "UNKNOWN"
@@ -917,8 +967,12 @@ class PortalBatchApp:
         if et.strip(): self._log("warn", et.strip())
         return out.read().decode("utf-8", errors="replace")
 
-    def _upload_file(self, sftp, local, remote): self._log("info", f"  {local.name}"); sftp.put(str(local), remote)
-    def _download_file(self, sftp, remote, local): local.parent.mkdir(parents=True, exist_ok=True); self._log("info", f"  {Path(remote).name}"); sftp.get(remote, str(local))
+    def _upload_file(self, sftp, local, remote):
+        self._log("info", f"  {local.name}"); sftp.put(str(local), remote)
+
+    def _download_file(self, sftp, remote, local):
+        local.parent.mkdir(parents=True, exist_ok=True)
+        self._log("info", f"  {Path(remote).name}"); sftp.get(remote, str(local))
 
     def _list_remote_files(self, sftp, rd):
         r = []
@@ -939,6 +993,7 @@ class PortalBatchApp:
     def _remote_exists(self, sftp, p):
         try: sftp.stat(p); return True
         except OSError: return False
+
 
 def main():
     root = Tk(); root.resizable(True, True); PortalBatchApp(root); root.mainloop()
