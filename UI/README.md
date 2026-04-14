@@ -29,6 +29,8 @@ chmod +x install.sh
 ./install.sh
 ```
 
+If no safe Tk runtime is already present, the installer will try to install a known-good Python 3.13 via `uv` first.
+
 Then launch:
 
 ```bash

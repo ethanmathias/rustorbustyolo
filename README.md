@@ -14,6 +14,7 @@ chmod +x install.sh
 The installer will:
 
 - find a Tk-enabled Python on your Mac
+- install a known-good Python 3.13 via `uv` if no safe Tk runtime is already available
 - create a local virtual environment at `~/Library/Application Support/rustorbust-venv`
 - install the UI dependencies from `UI/requirements.txt`
 - create or refresh `RustOrBust.command`
@@ -53,6 +54,7 @@ RustOrBust.bat
 The remote job can also bootstrap `torch`, `torchvision`, and `ultralytics` on the cluster before running if the checkbox stays enabled.
 
 - On macOS, `install.sh` installs the local UI dependencies into `~/Library/Application Support/rustorbust-venv`
+- On macOS, `install.sh` can also bootstrap a safe Tk-capable Python 3.13 via `uv`
 - On Windows, `install_windows.bat` creates a local `.venv` and installs the UI dependencies from `UI\requirements.txt`
 
 ## Notes
