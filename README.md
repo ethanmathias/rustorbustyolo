@@ -14,6 +14,13 @@ If you prefer to launch it directly, use a Tk-enabled interpreter such as:
 python3.12 rust_portal_gui.py
 ```
 
+On Windows:
+
+```bat
+install_windows.bat
+RustOrBust.bat
+```
+
 ## What the GUI does
 
 - prompts for the user's portal username and password
@@ -32,6 +39,8 @@ python3.12 -m pip install --user paramiko
 ```
 
 The remote job can also bootstrap `torch`, `torchvision`, and `ultralytics` on the cluster before running if the checkbox stays enabled.
+
+For Windows, `install_windows.bat` creates a local `.venv` and installs the UI dependencies from `UI\requirements.txt`.
 
 ## Notes
 

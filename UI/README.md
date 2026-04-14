@@ -32,6 +32,13 @@ Then launch:
 ./launch_rust_portal_gui.sh
 ```
 
+On Windows:
+
+```bat
+install_windows.bat
+RustOrBust.bat
+```
+
 ## Output location
 
 Each run is downloaded into:
