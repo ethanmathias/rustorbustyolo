@@ -8,6 +8,20 @@ REQ_FILE="$SCRIPT_DIR/UI/requirements.txt"
 LAUNCHER="$SCRIPT_DIR/RustOrBust.command"
 UV_BIN="$HOME/.local/bin/uv"
 
+ensure_uv() {
+    if [ -x "$UV_BIN" ]; then
+        return 0
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+        return 1
+    fi
+
+    echo "uv was not found. Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    [ -x "$UV_BIN" ]
+}
+
 find_uv_python() {
     local candidate
     for candidate in "$HOME"/.local/share/uv/python/cpython-3.13*-macos-aarch64-none/bin/python3.13; do
@@ -22,6 +36,7 @@ find_uv_python() {
 is_safe_tk_python() {
     local candidate="$1"
     local tk_path
+    local base_prefix
 
     if ! "$candidate" - <<'PY' >/dev/null 2>&1
 import tkinter
@@ -38,6 +53,32 @@ import _tkinter
 print(_tkinter.__file__)
 PY
 )"
+
+    base_prefix="$("$candidate" - <<'PY'
+import sys
+print(sys.base_prefix)
+PY
+)"
+
+    case "$candidate" in
+        /usr/bin/python3|/Library/Developer/CommandLineTools/*)
+            return 1
+            ;;
+    esac
+
+    case "$base_prefix" in
+        /Library/Developer/CommandLineTools/*)
+            return 1
+            ;;
+    esac
+
+    if ! "$candidate" - <<'PY' >/dev/null 2>&1
+import tkinter
+raise SystemExit(0 if tkinter.TkVersion >= 8.6 else 1)
+PY
+    then
+        return 1
+    fi
 
     if [ -n "$tk_path" ] && command -v otool >/dev/null 2>&1; then
         if otool -l "$tk_path" 2>/dev/null | grep -q "minos 26"; then
@@ -78,7 +119,7 @@ find_python() {
 }
 
 install_safe_tk_python() {
-    if [ ! -x "$UV_BIN" ]; then
+    if ! ensure_uv; then
         return 1
     fi
 
@@ -118,9 +159,25 @@ fi
 echo "Using Python: $PYTHON_BIN"
 mkdir -p "$(dirname "$VENV_DIR")"
 
+if [ -d "$VENV_DIR" ]; then
+    echo "Removing existing virtual environment:"
+    echo "  $VENV_DIR"
+    rm -rf "$VENV_DIR"
+fi
+
 echo "Creating virtual environment at:"
 echo "  $VENV_DIR"
 "$PYTHON_BIN" -m venv "$VENV_DIR"
+
+if ! "$VENV_DIR/bin/python3" - <<'PY' >/dev/null 2>&1
+import tkinter
+raise SystemExit(0 if tkinter.TkVersion >= 8.6 else 1)
+PY
+then
+    echo "The created virtual environment is still using an unsupported Tk runtime." >&2
+    echo "Refusing to continue with Tk < 8.6." >&2
+    exit 1
+fi
 
 echo "Upgrading pip..."
 "$VENV_DIR/bin/python3" -m pip install --upgrade pip
