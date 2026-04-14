@@ -27,14 +27,15 @@ def parse_args() -> argparse.Namespace:
 
 def find_images(input_dir: Path) -> list[Path]:
     return sorted(
-        path for path in input_dir.iterdir() if path.is_file() and path.suffix.lower() in IMAGE_SUFFIXES
+        p for p in input_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES
     )
 
 
 def main() -> None:
     args = parse_args()
 
-    input_dir = Path(args.input_dir).expanduser().resolve()
+    input_dir   = Path(args.input_dir).expanduser().resolve()
     output_root = Path(args.output_root).expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
 
@@ -42,7 +43,7 @@ def main() -> None:
     if not images:
         raise SystemExit(f"No images found in {input_dir}")
 
-    model = YOLO(args.model)
+    model   = YOLO(args.model)
     results = model.predict(
         source=str(input_dir),
         project=str(output_root),
@@ -58,52 +59,67 @@ def main() -> None:
         verbose=True,
     )
 
-    run_dir = output_root / args.run_name
-    summary_rows = []
+    run_dir          = output_root / args.run_name
+    summary_rows     = []
     total_detections = 0
 
     for result in results:
-        boxes = result.boxes
-        masks = result.masks
+        boxes  = result.boxes
+        masks  = result.masks
+        h, w   = result.orig_shape[:2]
 
-        confidences = []
+        confidences: list[float] = []
         if boxes is not None and boxes.conf is not None:
-            confidences = [float(value) for value in boxes.conf.tolist()]
+            confidences = [float(v) for v in boxes.conf.tolist()]
 
-        detection_count = len(confidences)
-        mask_count = 0
+        # Per-detection mask pixel areas
+        mask_areas_px: list[int] = []
         if masks is not None and masks.data is not None:
-            mask_count = int(masks.data.shape[0])
+            for m in masks.data:
+                mask_areas_px.append(int(m.sum().item()))
+
+        detection_count      = len(confidences)
+        total_mask_area_px   = sum(mask_areas_px)
+        image_pixels         = h * w
+        coverage_pct         = round(100.0 * total_mask_area_px / image_pixels, 4) if image_pixels else 0.0
 
         total_detections += detection_count
-        summary_rows.append(
-            {
-                "image": Path(result.path).name,
-                "detections": detection_count,
-                "masks": mask_count,
-                "max_confidence": round(max(confidences), 4) if confidences else "",
-                "avg_confidence": round(sum(confidences) / len(confidences), 4) if confidences else "",
-            }
-        )
+        summary_rows.append({
+            "image":              Path(result.path).name,
+            "detections":         detection_count,
+            "masks":              len(mask_areas_px),
+            "max_confidence":     round(max(confidences), 4) if confidences else "",
+            "avg_confidence":     round(sum(confidences) / len(confidences), 4) if confidences else "",
+            "mask_areas_px":      mask_areas_px,
+            "total_mask_area_px": total_mask_area_px,
+            "image_width_px":     w,
+            "image_height_px":    h,
+            "coverage_pct":       coverage_pct,
+            "confidences":        confidences,
+        })
 
-    csv_path = run_dir / "summary.csv"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    csv_path  = run_dir / "summary.csv"
     json_path = run_dir / "summary.json"
 
-    with csv_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(
-            handle,
-            fieldnames=["image", "detections", "masks", "max_confidence", "avg_confidence"],
-        )
+    with csv_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=[
+            "image", "detections", "masks",
+            "max_confidence", "avg_confidence",
+            "total_mask_area_px", "coverage_pct",
+            "image_width_px", "image_height_px",
+        ])
         writer.writeheader()
-        writer.writerows(summary_rows)
+        for row in summary_rows:
+            writer.writerow({k: row[k] for k in writer.fieldnames})
 
     payload = {
-        "model": args.model,
-        "input_dir": str(input_dir),
-        "output_dir": str(run_dir),
-        "images_processed": len(summary_rows),
-        "total_detections": total_detections,
-        "rows": summary_rows,
+        "model":             args.model,
+        "input_dir":         str(input_dir),
+        "output_dir":        str(run_dir),
+        "images_processed":  len(summary_rows),
+        "total_detections":  total_detections,
+        "rows":              summary_rows,
     }
     json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
