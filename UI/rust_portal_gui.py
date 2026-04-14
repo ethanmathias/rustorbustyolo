@@ -33,6 +33,17 @@ SQUEUE   = "/sw/ubuntu/custom/slurm/current/bin/squeue"
 SACCT    = "/sw/ubuntu/custom/slurm/current/bin/sacct"
 REMOTE_PYTHON = "/sw/ubuntu2204/ebu082025/software/common/compiler/gcc/11.4.0/python/3.12.3/bin/python3"
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
+UNIT_TO_METERS = {
+    "pm": 1e-12,
+    "nm": 1e-9,
+    "µm": 1e-6,
+    "um": 1e-6,
+    "mm": 1e-3,
+    "cm": 1e-2,
+    "m": 1.0,
+    "km": 1e3,
+}
+DISPLAY_UNIT_OPTIONS = ("px", "nm", "µm", "mm", "cm", "m")
 
 LOG_COLORS = {"info": "#c0c0c0", "cmd": "#88aaff", "success": "#66ff88",
               "warn": "#ffcc55", "error": "#ff5555", "head": "#ffffff"}
@@ -320,9 +331,12 @@ class PortalBatchApp:
         self.scale_bar_px_var = StringVar(value="")
         self.scale_bar_unit_var = StringVar(value="")
         self.scale_unit_label_var = StringVar(value="mm")
+        self.display_unit_var = StringVar(value="µm")
         self._analysis_images: list[Path] = []
         self._analysis_summary: dict = {}
         self._analysis_current_path: Path | None = None
+        self._analysis_scale_by_image: dict[str, dict[str, str]] = {}
+        self._analysis_loading_scale_state = False
         self._analysis_pil_img: "Image.Image | None" = None
         self._analysis_photo = None
         self._analysis_zoom = 1.0
@@ -332,8 +346,41 @@ class PortalBatchApp:
         self.log_queue = Queue(); self._last_result_dir = None; self._thumbnail_refs = []
         # Bind scale vars to refresh stats on change
         for v in (self.scale_bar_px_var, self.scale_bar_unit_var, self.scale_unit_label_var):
-            v.trace_add("write", lambda *_: self._analysis_refresh_stats_if_open())
+            v.trace_add("write", lambda *_: self._analysis_on_scale_change())
+        self.display_unit_var.trace_add("write", lambda *_: self._analysis_refresh_stats_if_open())
         apply_dark_theme(root); self._build_ui(); root.after(120, self._drain_log_queue)
+
+    def _analysis_current_key(self) -> str | None:
+        return str(self._analysis_current_path) if self._analysis_current_path else None
+
+    def _analysis_on_scale_change(self):
+        if not self._analysis_loading_scale_state:
+            self._analysis_save_current_scale_state()
+        self._analysis_refresh_stats_if_open()
+
+    def _analysis_save_current_scale_state(self):
+        key = self._analysis_current_key()
+        if not key:
+            return
+        state = {
+            "scale_px": self.scale_bar_px_var.get().strip(),
+            "scale_value": self.scale_bar_unit_var.get().strip(),
+            "scale_unit": self.scale_unit_label_var.get().strip() or "mm",
+        }
+        if any(state.values()):
+            self._analysis_scale_by_image[key] = state
+        elif key in self._analysis_scale_by_image:
+            del self._analysis_scale_by_image[key]
+
+    def _analysis_load_scale_state(self, path: Path):
+        state = self._analysis_scale_by_image.get(str(path), {})
+        self._analysis_loading_scale_state = True
+        try:
+            self.scale_bar_px_var.set(state.get("scale_px", ""))
+            self.scale_bar_unit_var.set(state.get("scale_value", ""))
+            self.scale_unit_label_var.set(state.get("scale_unit", "mm"))
+        finally:
+            self._analysis_loading_scale_state = False
 
     def _analysis_refresh_stats_if_open(self):
         if self._analysis_current_path:
@@ -509,6 +556,14 @@ class PortalBatchApp:
         ttk.Label(scale_frame, text="px =", style="Dim.TLabel").pack(side="left")
         ttk.Entry(scale_frame, textvariable=self.scale_bar_unit_var, width=6).pack(side="left", padx=(4,2))
         ttk.Entry(scale_frame, textvariable=self.scale_unit_label_var, width=4).pack(side="left", padx=(0,8))
+        ttk.Label(scale_frame, text="Display:", style="Dim.TLabel").pack(side="left", padx=(10,2))
+        ttk.Combobox(
+            scale_frame,
+            textvariable=self.display_unit_var,
+            values=list(DISPLAY_UNIT_OPTIONS),
+            state="readonly",
+            width=5,
+        ).pack(side="left", padx=(0,8))
         self._scale_status_label = ttk.Label(scale_frame, text="", style="Dim.TLabel",
                                               font=("Helvetica", 10, "italic"))
         self._scale_status_label.pack(side="left")
@@ -645,6 +700,7 @@ class PortalBatchApp:
         path = self._analysis_images[sel[0]]
         self._analysis_current_path = path
         self._analysis_zoom = 1.0
+        self._analysis_load_scale_state(path)
         self._analysis_show_image(path)
         self._analysis_update_stats(path)
 
@@ -709,11 +765,20 @@ class PortalBatchApp:
 
         scale_px_s  = self.scale_bar_px_var.get().strip()
         scale_len_s = self.scale_bar_unit_var.get().strip()
-        unit_label  = self.scale_unit_label_var.get().strip() or "mm"
+        source_unit = self.scale_unit_label_var.get().strip() or "mm"
+        display_unit = self.display_unit_var.get().strip() or "px"
         px_per_unit: float | None = None
+        px_per_display_unit: float | None = None
         if scale_px_s and scale_len_s:
-            try: px_per_unit = float(scale_px_s) / float(scale_len_s)
-            except ValueError: pass
+            try:
+                px_per_unit = float(scale_px_s) / float(scale_len_s)
+            except ValueError:
+                pass
+        if px_per_unit is not None and display_unit != "px":
+            source_unit_m = UNIT_TO_METERS.get(source_unit)
+            display_unit_m = UNIT_TO_METERS.get(display_unit)
+            if source_unit_m and display_unit_m:
+                px_per_display_unit = px_per_unit * (display_unit_m / source_unit_m)
 
         r = 0
         def row_lbl(label, value, highlight=False):
@@ -746,15 +811,20 @@ class PortalBatchApp:
             row_lbl("Detections",   row_data.get("detections", "?"), highlight=True)
             row_lbl("Max conf",     row_data.get("max_confidence", "—"))
             row_lbl("Avg conf",     row_data.get("avg_confidence", "—"))
+            if px_per_unit is not None:
+                row_lbl("Scale", f"{scale_px_s} px = {scale_len_s} {source_unit}")
+            row_lbl("Display unit", f"{display_unit}²" if display_unit != "px" else "px²")
             sep()
 
             total_px = row_data.get("total_mask_area_px")
             cov      = row_data.get("coverage_pct")
             if total_px is not None:
                 row_lbl("Rust area",    f"{total_px:,} px²", highlight=True)
-                if px_per_unit is not None:
-                    real_area = total_px / (px_per_unit ** 2)
-                    row_lbl(f"Rust area ({unit_label}²)", f"{real_area:.4f} {unit_label}²", highlight=True)
+                if display_unit == "px":
+                    row_lbl("Displayed area", f"{total_px:,} px²", highlight=True)
+                elif px_per_display_unit is not None:
+                    real_area = total_px / (px_per_display_unit ** 2)
+                    row_lbl(f"Displayed area ({display_unit}²)", f"{real_area:.4f} {display_unit}²", highlight=True)
                 if cov is not None:
                     row_lbl("Coverage",  f"{cov:.2f}%", highlight=True)
                 sep()
@@ -768,8 +838,12 @@ class PortalBatchApp:
                 r += 1
                 for i, area in enumerate(areas):
                     conf = f"{confs[i]:.3f}" if i < len(confs) else "—"
-                    real = (f"{area/(px_per_unit**2):.4f} {unit_label}²"
-                            if px_per_unit else f"{area:,} px²")
+                    if display_unit == "px":
+                        real = f"{area:,} px²"
+                    elif px_per_display_unit is not None:
+                        real = f"{area/(px_per_display_unit**2):.4f} {display_unit}²"
+                    else:
+                        real = f"{area:,} px²"
                     ttk.Label(self.stats_inner,
                               text=f"#{i+1}",
                               style="Dim.TLabel").grid(row=r, column=0, sticky="w", padx=(12,4), pady=1)
