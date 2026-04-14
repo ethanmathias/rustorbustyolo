@@ -136,6 +136,101 @@ def _lbl(parent, text, row, col, **kw):
 # ─────────────────────────────────────────────────────────────────────────────
 # Scale-bar detection with OCR
 # ─────────────────────────────────────────────────────────────────────────────
+def _is_scale_green(rgb: tuple[int, int, int]) -> bool:
+    r, g, b = rgb
+    return g >= 110 and g >= r + 35 and g >= b + 35
+
+
+def _longest_green_run(img: "Image.Image", y: int) -> tuple[int, int]:
+    pixels = img.load()
+    w, _ = img.size
+    run = 0
+    best_run = 0
+    start = 0
+    best_start = 0
+    for x in range(w):
+        if _is_scale_green(pixels[x, y]):
+            if run == 0:
+                start = x
+            run += 1
+            if run > best_run:
+                best_run = run
+                best_start = start
+        else:
+            run = 0
+    return best_run, best_start
+
+
+def _ocr_scale_label(label_crop: "Image.Image") -> tuple[float | None, str]:
+    if not OCR_AVAILABLE:
+        return None, ""
+
+    # Try a few OCR-friendly variants. Hard thresholding is only a fallback because it
+    # can turn "um" into "pm" on these green microscope overlays.
+    r, g, b = label_crop.split()
+    variants: list["Image.Image"] = []
+    green = ImageEnhance.Contrast(g).enhance(2.5)
+    variants.append(green.resize((max(1, green.width * 4), max(1, green.height * 4)), Image.Resampling.LANCZOS))
+
+    gray = ImageEnhance.Contrast(label_crop.convert("L")).enhance(2.5)
+    variants.append(gray.resize((max(1, gray.width * 4), max(1, gray.height * 4)), Image.Resampling.LANCZOS))
+
+    green_emphasis = Image.merge("RGB", (Image.new("L", g.size, 0), g, Image.new("L", g.size, 0))).convert("L")
+    green_emphasis = ImageEnhance.Contrast(green_emphasis).enhance(3.5)
+    green_emphasis = green_emphasis.filter(ImageFilter.MedianFilter(size=3))
+    variants.append(
+        green_emphasis.resize(
+            (max(1, green_emphasis.width * 4), max(1, green_emphasis.height * 4)),
+            Image.Resampling.LANCZOS,
+        )
+    )
+    variants.append(
+        green_emphasis.point(lambda v: 255 if v > 90 else 0).resize(
+            (max(1, green_emphasis.width * 4), max(1, green_emphasis.height * 4)),
+            Image.Resampling.LANCZOS,
+        )
+    )
+
+    configs = [
+        "--psm 7",
+        "--psm 7 -c tessedit_char_whitelist=0123456789.µumnpkMG[]| ",
+        "--psm 6",
+    ]
+    raws: list[str] = []
+    for variant in variants:
+        for config in configs:
+            try:
+                raw = pytesseract.image_to_string(variant, config=config)
+            except Exception:
+                continue
+            raw = raw.strip()
+            if raw and raw not in raws:
+                raws.append(raw)
+
+    for raw in raws:
+        cleaned = (
+            raw.replace("μ", "µ")
+            .replace("|", " ")
+            .replace("[", " ")
+            .replace("]", " ")
+            .replace("{", " ")
+            .replace("}", " ")
+        )
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        cleaned = cleaned.replace("pum", "um").replace("µum", "µm")
+        match = re.search(r"([\d]+(?:[.,]\d+)?)\s*([µu]m|nm|mm|cm|pm|km)\b", cleaned, re.IGNORECASE)
+        if match:
+            value = float(match.group(1).replace(",", "."))
+            unit = match.group(2).strip()
+            if unit.lower() == "pm" and value >= 10:
+                unit = "µm"
+            if unit.lower() == "um":
+                unit = "µm"
+            return value, unit
+
+    return None, ""
+
+
 def read_scale_bar(img_path: Path) -> tuple[int | None, float | None, str]:
     """
     Analyse the bottom-right corner of an image.
@@ -148,68 +243,47 @@ def read_scale_bar(img_path: Path) -> tuple[int | None, float | None, str]:
         return None, None, ""
 
     try:
-        img = Image.open(img_path).convert("L")
+        img = Image.open(img_path).convert("RGB")
         w, h = img.size
 
-        # ── 1. Detect bar pixel length ──────────────────────────────────────
-        # Crop bottom-right 35% × 20%
-        cx = int(w * 0.65); cy = int(h * 0.80)
+        # Restrict to the microscope overlay area in the bottom-right corner.
+        cx = int(w * 0.60)
+        cy = int(h * 0.72)
         bar_crop = img.crop((cx, cy, w, h))
         bcw, bch = bar_crop.size
-        pixels = bar_crop.load()
 
-        best_run = 0; best_row = 0
-        for y in range(bch):
-            for threshold, bright in [(200, True), (55, False)]:
-                run = mx = 0
-                for x in range(bcw):
-                    v = pixels[x, y]
-                    hit = v > threshold if bright else v < threshold
-                    if hit:
-                        run += 1; mx = max(mx, run)
-                    else:
-                        run = 0
-                if mx > best_run:
-                    best_run = mx; best_row = y
-        bar_px = best_run if best_run > 10 else None
+        # Prefer long green runs to avoid mistaking the dark border for the scale bar.
+        candidates: list[tuple[int, int, int]] = []
+        for y in range(int(bch * 0.10), bch):
+            run, start = _longest_green_run(bar_crop, y)
+            if run >= 20:
+                candidates.append((run, y, start))
 
-        # ── 2. OCR the label below the bar ──────────────────────────────────
+        if candidates:
+            best_run, best_row, best_start = max(candidates, key=lambda item: (item[0], item[1]))
+            band = [
+                item for item in candidates
+                if abs(item[1] - best_row) <= 4 and abs(item[2] - best_start) <= 20 and item[0] >= best_run * 0.60
+            ]
+            bar_px = max(item[0] for item in band)
+            bar_bottom = max(item[1] for item in band)
+            bar_left = min(item[2] for item in band)
+        else:
+            bar_px = None
+            bar_bottom = 0
+            bar_left = 0
+
         physical_value: float | None = None
         unit_str = ""
 
         if OCR_AVAILABLE and bar_px is not None:
-            # Crop a band below the bar line (next ~15% of the crop height)
-            label_y0 = best_row + 2
-            label_y1 = min(bch, best_row + max(20, int(bch * 0.25)))
-            label_crop = bar_crop.crop((0, label_y0, bcw, label_y1))
-
-            # Pre-process for OCR: upscale + enhance contrast
-            scale_factor = max(1, int(60 / label_crop.height)) + 2
-            lw = label_crop.width * scale_factor
-            lh = label_crop.height * scale_factor
-            label_up = label_crop.resize((lw, lh), Image.LANCZOS)
-            label_up = ImageEnhance.Contrast(label_up).enhance(3.0)
-            # Invert if text is white on dark
-            mean_brightness = sum(label_up.getdata()) / (lw * lh)
-            if mean_brightness < 128:
-                label_up = ImageOps.invert(label_up)
-
-            try:
-                raw = pytesseract.image_to_string(
-                    label_up,
-                    config="--psm 7 -c tessedit_char_whitelist=0123456789.µumnpkMG "
-                )
-                raw = raw.strip()
-                # Parse "100 um", "0.5 mm", "500nm", "2.3µm" etc.
-                m = re.search(r"([\d]+(?:[.,]\d+)?)\s*([µu]m|nm|mm|cm|pm|km)", raw, re.IGNORECASE)
-                if m:
-                    physical_value = float(m.group(1).replace(",", "."))
-                    unit_str = m.group(2).strip()
-                    # Normalise 'um' -> 'µm'
-                    if unit_str.lower() == "um":
-                        unit_str = "µm"
-            except Exception:
-                pass
+            label_x0 = max(0, bar_left - 24)
+            label_x1 = min(bcw, bar_left + bar_px + 24)
+            label_y0 = min(bch, bar_bottom + 12)
+            label_y1 = min(bch, bar_bottom + max(40, int(bch * 0.22)))
+            if label_y1 > label_y0 and label_x1 > label_x0:
+                label_crop = bar_crop.crop((label_x0, label_y0, label_x1, label_y1))
+                physical_value, unit_str = _ocr_scale_label(label_crop)
 
         return bar_px, physical_value, unit_str
 
