@@ -59,7 +59,14 @@ class SubmissionConfig:
 
 def discover_model_candidates(repo_root):
     seen, out = set(), []
-    for p in [repo_root/"models"/"35images.pt", repo_root/"35images.pt"]:
+    parent_root = repo_root.parent
+    preferred = [
+        parent_root / "models" / "35images.pt",
+        repo_root / "models" / "35images.pt",
+        parent_root / "35images.pt",
+        repo_root / "35images.pt",
+    ]
+    for p in preferred:
         if p.exists() and p not in seen: out.append(p); seen.add(p)
     for p in sorted(repo_root.rglob("*.pt")):
         if not p.name.startswith("._") and p not in seen: out.append(p); seen.add(p)
