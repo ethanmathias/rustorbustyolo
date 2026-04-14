@@ -1,0 +1,198 @@
+=== YOLOv8-seg Training: Tue Apr 14 01:06:24 PM EDT 2026 ===
+Tue Apr 14 13:06:24 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.124.06             Driver Version: 570.124.06     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce GTX 1080 Ti     Off |   00000000:04:00.0 Off |                  N/A |
+| 28%   23C    P8              7W /  250W |       0MiB /  11264MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+/var/spool/slurmd/job5815931/slurm_script: line 17: /u/fkm5yp/.local/bin/pip: No such file or directory
+/var/spool/slurmd/job5815931/slurm_script: line 18: /u/fkm5yp/.local/bin/pip: No such file or directory
+CUDA: True
+CUDA available: True
+GPU: NVIDIA GeForce GTX 1080 Ti
+Ultralytics 8.4.37 🚀 Python-3.12.3 torch-2.6.0+cu124 CUDA:0 (NVIDIA GeForce GTX 1080 Ti, 11165MiB)
+[34m[1mengine/trainer: [0magnostic_nms=False, amp=True, angle=1.0, augment=True, auto_augment=randaugment, batch=8, bgr=0.0, box=7.5, cache=False, cfg=None, classes=None, close_mosaic=10, cls=0.5, cls_pw=0.0, compile=False, conf=None, copy_paste=0.3, copy_paste_mode=flip, cos_lr=False, cutmix=0.0, data=/u/fkm5yp/rustdetection/dataset/data.yaml, degrees=15.0, deterministic=True, device=0, dfl=1.5, dnn=False, dropout=0.0, dynamic=False, embed=None, end2end=None, epochs=150, erasing=0.4, exist_ok=False, fliplr=0.5, flipud=0.5, format=torchscript, fraction=1.0, freeze=None, half=False, hsv_h=0.015, hsv_s=0.4, hsv_v=0.4, imgsz=640, int8=False, iou=0.7, keras=False, kobj=1.0, line_width=None, lr0=0.01, lrf=0.01, mask_ratio=4, max_det=300, mixup=0.0, mode=train, model=yolov8s-seg.pt, momentum=0.937, mosaic=1.0, multi_scale=0.0, name=rust_seg, nbs=64, nms=False, opset=None, optimize=False, optimizer=auto, overlap_mask=True, patience=30, perspective=0.0, plots=True, pose=12.0, pretrained=True, profile=False, project=/u/fkm5yp/rustdetection/runs, rect=False, resume=False, retina_masks=False, rle=1.0, save=True, save_conf=False, save_crop=False, save_dir=/u/fkm5yp/rustdetection/runs/rust_seg, save_frames=False, save_json=False, save_period=-1, save_txt=False, scale=0.5, seed=0, shear=0.0, show=False, show_boxes=True, show_conf=True, show_labels=True, simplify=True, single_cls=False, source=None, split=val, stream_buffer=False, task=segment, time=None, tracker=botsort.yaml, translate=0.1, val=True, verbose=True, vid_stride=1, visualize=False, warmup_bias_lr=0.1, warmup_epochs=3.0, warmup_momentum=0.8, weight_decay=0.0005, workers=8, workspace=None
+Overriding model.yaml nc=80 with nc=1
+
+                   from  n    params  module                                       arguments                     
+  0                  -1  1       928  ultralytics.nn.modules.conv.Conv             [3, 32, 3, 2]                 
+  1                  -1  1     18560  ultralytics.nn.modules.conv.Conv             [32, 64, 3, 2]                
+  2                  -1  1     29056  ultralytics.nn.modules.block.C2f             [64, 64, 1, True]             
+  3                  -1  1     73984  ultralytics.nn.modules.conv.Conv             [64, 128, 3, 2]               
+  4                  -1  2    197632  ultralytics.nn.modules.block.C2f             [128, 128, 2, True]           
+  5                  -1  1    295424  ultralytics.nn.modules.conv.Conv             [128, 256, 3, 2]              
+  6                  -1  2    788480  ultralytics.nn.modules.block.C2f             [256, 256, 2, True]           
+  7                  -1  1   1180672  ultralytics.nn.modules.conv.Conv             [256, 512, 3, 2]              
+  8                  -1  1   1838080  ultralytics.nn.modules.block.C2f             [512, 512, 1, True]           
+  9                  -1  1    656896  ultralytics.nn.modules.block.SPPF            [512, 512, 5]                 
+ 10                  -1  1         0  torch.nn.modules.upsampling.Upsample         [None, 2, 'nearest']          
+ 11             [-1, 6]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
+ 12                  -1  1    591360  ultralytics.nn.modules.block.C2f             [768, 256, 1]                 
+ 13                  -1  1         0  torch.nn.modules.upsampling.Upsample         [None, 2, 'nearest']          
+ 14             [-1, 4]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
+ 15                  -1  1    148224  ultralytics.nn.modules.block.C2f             [384, 128, 1]                 
+ 16                  -1  1    147712  ultralytics.nn.modules.conv.Conv             [128, 128, 3, 2]              
+ 17            [-1, 12]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
+ 18                  -1  1    493056  ultralytics.nn.modules.block.C2f             [384, 256, 1]                 
+ 19                  -1  1    590336  ultralytics.nn.modules.conv.Conv             [256, 256, 3, 2]              
+ 20             [-1, 9]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
+ 21                  -1  1   1969152  ultralytics.nn.modules.block.C2f             [768, 512, 1]                 
+ 22        [15, 18, 21]  1   2770931  ultralytics.nn.modules.head.Segment          [1, 32, 128, 16, None, [128, 256, 512]]
+YOLOv8s-seg summary: 152 layers, 11,790,483 parameters, 11,790,467 gradients, 40.2 GFLOPs
+
+Transferred 411/417 items from pretrained weights
+Freezing layer 'model.22.dfl.conv.weight'
+[34m[1mAMP: [0mrunning Automatic Mixed Precision (AMP) checks...
+[KDownloading https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26n.pt to 'yolo26n.pt': 100% ━━━━━━━━━━━━ 5.3MB 95.6MB/s 0.1s
+[34m[1mAMP: [0mchecks passed ✅
+[34m[1mtrain: [0mFast image access ✅ (ping: 0.0±0.0 ms, read: 0.0±0.0 MB/s, size: 0.1 KB)
+[31m[1mrequirements:[0m Ultralytics requirement ['pi-heif'] not found, attempting AutoUpdate...
+[31m[1mrequirements:[0m Ultralytics requirement ['pi-heif'] not found, attempting AutoUpdate...
+[31m[1mrequirements:[0m Ultralytics requirement ['pi-heif'] not found, attempting AutoUpdate...
+[31m[1mrequirements:[0m Ultralytics requirement ['pi-heif'] not found, attempting AutoUpdate...
+[31m[1mrequirements:[0m Ultralytics requirement ['pi-heif'] not found, attempting AutoUpdate...
+[31m[1mrequirements:[0m Ultralytics requirement ['pi-heif'] not found, attempting AutoUpdate...
+[31m[1mrequirements:[0m Ultralytics requirement ['pi-heif'] not found, attempting AutoUpdate...
+[31m[1mrequirements:[0m Ultralytics requirement ['pi-heif'] not found, attempting AutoUpdate...
+WARNING ⚠️ Retry 1/2 failed: Command 'pip install --no-cache-dir "pi-heif" ' returned non-zero exit status 1.
+WARNING ⚠️ Retry 1/2 failed: Command 'pip install --no-cache-dir "pi-heif" ' returned non-zero exit status 1.
+WARNING ⚠️ Retry 1/2 failed: Command 'pip install --no-cache-dir "pi-heif" ' returned non-zero exit status 1.
+WARNING ⚠️ Retry 1/2 failed: Command 'pip install --no-cache-dir "pi-heif" ' returned non-zero exit status 1.
+WARNING ⚠️ Retry 1/2 failed: Command 'pip install --no-cache-dir "pi-heif" ' returned non-zero exit status 1.
+WARNING ⚠️ Retry 1/2 failed: Command 'pip install --no-cache-dir "pi-heif" ' returned non-zero exit status 1.
+Defaulting to user installation because normal site-packages is not writeable
+Collecting pi-heif
+  Downloading pi_heif-1.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.3 kB)
+Requirement already satisfied: pillow>=11.1.0 in /u/fkm5yp/.local/lib/python3.12/site-packages (from pi-heif) (12.2.0)
+Downloading pi_heif-1.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (1.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.5/1.5 MB 11.6 MB/s eta 0:00:00
+Installing collected packages: pi-heif
+Successfully installed pi-heif-1.3.0
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 10.2s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+Defaulting to user installation because normal site-packages is not writeable
+Collecting pi-heif
+  Downloading pi_heif-1.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.3 kB)
+Requirement already satisfied: pillow>=11.1.0 in /u/fkm5yp/.local/lib/python3.12/site-packages (from pi-heif) (12.2.0)
+Downloading pi_heif-1.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (1.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.5/1.5 MB 13.4 MB/s eta 0:00:00
+Installing collected packages: pi-heif
+Successfully installed pi-heif-1.3.0
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 10.2s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: pi-heif in /u/fkm5yp/.local/lib/python3.12/site-packages (1.3.0)
+Requirement already satisfied: pillow>=11.1.0 in /u/fkm5yp/.local/lib/python3.12/site-packages (from pi-heif) (12.2.0)
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 16.8s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: pi-heif in /u/fkm5yp/.local/lib/python3.12/site-packages (1.3.0)
+Requirement already satisfied: pillow>=11.1.0 in /u/fkm5yp/.local/lib/python3.12/site-packages (from pi-heif) (12.2.0)
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 16.8s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: pi-heif in /u/fkm5yp/.local/lib/python3.12/site-packages (1.3.0)
+Requirement already satisfied: pillow>=11.1.0 in /u/fkm5yp/.local/lib/python3.12/site-packages (from pi-heif) (12.2.0)
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 16.9s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: pi-heif in /u/fkm5yp/.local/lib/python3.12/site-packages (1.3.0)
+Requirement already satisfied: pillow>=11.1.0 in /u/fkm5yp/.local/lib/python3.12/site-packages (from pi-heif) (12.2.0)
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 17.0s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: pi-heif in /u/fkm5yp/.local/lib/python3.12/site-packages (1.3.0)
+Requirement already satisfied: pillow>=11.1.0 in /u/fkm5yp/.local/lib/python3.12/site-packages (from pi-heif) (12.2.0)
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 17.1s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+[K[34m[1mtrain: [0mScanning /u/fkm5yp/rustdetection/dataset/train/labels... 0 images, 0 backgrounds, 1 corrupt: 4% ──────────── 1/28 59.6s/it 17.9s<26:49Defaulting to user installation because normal site-packages is not writeable
+Requirement already satisfied: pi-heif in /u/fkm5yp/.local/lib/python3.12/site-packages (1.3.0)
+Requirement already satisfied: pillow>=11.1.0 in /u/fkm5yp/.local/lib/python3.12/site-packages (from pi-heif) (12.2.0)
+
+[notice] A new release of pip is available: 24.0 -> 26.0.1
+[notice] To update, run: pip install --upgrade pip
+
+[31m[1mrequirements:[0m AutoUpdate success ✅ 17.1s
+WARNING ⚠️ [31m[1mrequirements:[0m [1mRestart runtime or rerun command for updates to take effect[0m
+
+[K[34m[1mtrain: [0mScanning /u/fkm5yp/rustdetection/dataset/train/labels... 0 images, 0 backgrounds, 28 corrupt: 100% ━━━━━━━━━━━━ 28/28 1.6it/s 18.0s
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/06ec42e8-63.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/06ec42e8-63.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/1a8f2adf-47.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/1a8f2adf-47.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/2ad8f8bd-67.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/2ad8f8bd-67.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/2c8c4950-27.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/2c8c4950-27.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/3523d665-17.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/3523d665-17.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/59465244-27.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/59465244-27.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/63ac3235-48.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/63ac3235-48.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/6fbae02b-70.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/6fbae02b-70.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/8793719f-54.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/8793719f-54.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/98056688-64.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/98056688-64.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/a4a74e6e-69.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/a4a74e6e-69.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/a6dbdbbb-16.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/a6dbdbbb-16.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/b58a42b4-22.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/b58a42b4-22.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/b82d925c-48.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/b82d925c-48.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/b928ec59-71.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/b928ec59-71.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/bce21a45-17.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/bce21a45-17.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/c0a04e22-28.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/c0a04e22-28.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/c54d98cb-72.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/c54d98cb-72.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/d5fd38e5-14.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/d5fd38e5-14.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/df84488e-15.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/df84488e-15.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/e3be2745-68.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/e3be2745-68.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/e5a5e0ae-73.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/e5a5e0ae-73.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/ece7f944-11.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/ece7f944-11.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/f128cce2-31.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/f128cce2-31.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/f713481c-65.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/f713481c-65.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/fdf59f81-10.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/fdf59f81-10.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/feb8ecb5-23.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/feb8ecb5-23.jpg'
+[34m[1mtrain: [0m/u/fkm5yp/rustdetection/dataset/train/images/ff11f1a7-70.jpg: ignoring corrupt image/label: cannot identify image file '/u/fkm5yp/rustdetection/dataset/train/images/ff11f1a7-70.jpg'
+WARNING ⚠️ [34m[1mtrain: [0mNo labels found in /u/fkm5yp/rustdetection/dataset/train/labels.cache. See https://docs.ultralytics.com/datasets for dataset formatting guidance.
+ERROR: Model file missing or too small: 
+=== Done: Tue Apr 14 01:07:23 PM EDT 2026 ===

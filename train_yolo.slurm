@@ -10,21 +10,23 @@
 #SBATCH -t 4:00:00
 #SBATCH --gres=gpu:1
 
+PYTHON=/sw/ubuntu2204/ebu082025/software/common/compiler/gcc/11.4.0/python/3.12.3/bin/python
+
 echo "=== YOLOv8-seg Training: $(date) ==="
 nvidia-smi
-module load gcc
 cd /u/fkm5yp/rustdetection
 
-pip uninstall torch torchvision -y --quiet 2>/dev/null
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124 --quiet 2>&1 | tail -1
-pip install ultralytics --quiet 2>&1 | tail -1
+$PYTHON -c "import torch; print(torch.cuda.is_available(), torch.__version__)"
 
-python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"NONE\"}')"
+$PYTHON -u train_yolo.py
 
-python3 -u train_yolo.py
-
-# Save best model with image count label
+LATEST=$(ls -td runs/rust_seg*/weights/best.pt 2>/dev/null | head -1)
 N=$(ls labeled/images/ | wc -l | tr -d ' ')
-cp runs/rust_seg/weights/best.pt models/${N}images.pt
-echo "=== Saved models/${N}images.pt ==="
+mkdir -p models
+if [ -f "$LATEST" ] && [ $(stat -c%s "$LATEST") -gt 1000000 ]; then
+    cp "$LATEST" models/${N}images.pt
+    echo "=== Saved models/${N}images.pt ==="
+else
+    echo "ERROR: Model file missing or too small: $LATEST"
+fi
 echo "=== Done: $(date) ==="
