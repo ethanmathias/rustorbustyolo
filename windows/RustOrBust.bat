@@ -1,7 +1,9 @@
 @echo off
 setlocal
 
-cd /d "%~dp0"
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..") do set "REPO_ROOT=%%~fI"
+cd /d "%REPO_ROOT%"
 
 if exist ".venv\Scripts\python.exe" (
     set "PYTHON_EXE=.venv\Scripts\python.exe"
@@ -19,7 +21,7 @@ echo Launching RustOrBust...
 if errorlevel 1 (
     echo.
     echo RustOrBust failed to launch.
-    echo Run install_windows.bat first, or check that Python and Tkinter are installed.
+    echo Run windows\install_windows.bat first, or check that Python and Tkinter are installed.
     echo.
     pause
 )

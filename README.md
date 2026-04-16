@@ -2,13 +2,20 @@
 
 This repo now includes a small GUI for submitting batch rust-detection jobs to `portal.cs.virginia.edu`.
 
+## Installer layout
+
+Platform-specific launchers and installers are grouped into:
+
+- `macos/`
+- `windows/`
+
 ## macOS install and use
 
 Run the installer once:
 
 ```bash
-chmod +x install.sh
-./install.sh
+chmod +x macos/install.sh
+./macos/install.sh
 ```
 
 The installer will:
@@ -17,12 +24,12 @@ The installer will:
 - install a known-good Python 3.13 via `uv` if no safe Tk runtime is already available
 - create a local virtual environment at `~/Library/Application Support/rustorbust-venv`
 - install the UI dependencies from `UI/requirements.txt`, including `pytesseract` for OCR
-- create or refresh `RustOrBust.command`
+- create or refresh `macos/RustOrBust.command`
 
 After setup, launch the app with:
 
 ```bash
-./RustOrBust.command
+./macos/RustOrBust.command
 ```
 
 If you prefer to run it directly instead of using the launcher:
@@ -36,8 +43,8 @@ If you prefer to run it directly instead of using the launcher:
 On Windows:
 
 ```bat
-install_windows.bat
-RustOrBust.bat
+windows\install_windows.bat
+windows\RustOrBust.bat
 ```
 
 ## What the GUI does
@@ -53,9 +60,9 @@ RustOrBust.bat
 
 The remote job can also bootstrap `torch`, `torchvision`, and `ultralytics` on the cluster before running if the checkbox stays enabled.
 
-- On macOS, `install.sh` installs the local UI dependencies into `~/Library/Application Support/rustorbust-venv`
-- On macOS, `install.sh` can also bootstrap a safe Tk-capable Python 3.13 via `uv`
-- On Windows, `install_windows.bat` creates a local `.venv` and installs the UI dependencies from `UI\requirements.txt`
+- On macOS, `macos/install.sh` installs the local UI dependencies into `~/Library/Application Support/rustorbust-venv`
+- On macOS, `macos/install.sh` can also bootstrap a safe Tk-capable Python 3.13 via `uv`
+- On Windows, `windows/install_windows.bat` creates a local `.venv` and installs the UI dependencies from `UI\requirements.txt`
 - OCR also requires the `tesseract` executable itself to be installed on the machine
 
 ## Notes

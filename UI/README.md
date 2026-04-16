@@ -25,8 +25,8 @@ This folder contains the files needed to run batch rust segmentation through a s
 Run the installer from the repo root:
 
 ```bash
-chmod +x install.sh
-./install.sh
+chmod +x macos/install.sh
+./macos/install.sh
 ```
 
 If no safe Tk runtime is already present, the installer will try to install a known-good Python 3.13 via `uv` first.
@@ -34,7 +34,7 @@ If no safe Tk runtime is already present, the installer will try to install a kn
 Then launch:
 
 ```bash
-./RustOrBust.command
+./macos/RustOrBust.command
 ```
 
 Or run the UI directly:
@@ -48,8 +48,8 @@ Or run the UI directly:
 On Windows:
 
 ```bat
-install_windows.bat
-RustOrBust.bat
+windows\install_windows.bat
+windows\RustOrBust.bat
 ```
 
 Both installers install the Python OCR package `pytesseract`.

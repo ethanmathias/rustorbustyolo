@@ -1,7 +1,9 @@
 @echo off
 setlocal
 
-cd /d "%~dp0"
+set "SCRIPT_DIR=%~dp0"
+for %%I in ("%SCRIPT_DIR%..") do set "REPO_ROOT=%%~fI"
+cd /d "%REPO_ROOT%"
 
 where py >nul 2>nul
 if %ERRORLEVEL%==0 (
@@ -53,7 +55,7 @@ if errorlevel 1 (
 
 echo.
 echo Setup complete.
-echo Run RustOrBust.bat to launch the UI.
+echo Run windows\RustOrBust.bat to launch the UI.
 echo.
 pause
 endlocal

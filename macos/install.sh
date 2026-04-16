@@ -2,9 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)"
 VENV_DIR="$HOME/Library/Application Support/rustorbust-venv"
-GUI_SCRIPT="$SCRIPT_DIR/UI/rust_portal_gui.py"
-REQ_FILE="$SCRIPT_DIR/UI/requirements.txt"
+GUI_SCRIPT="$REPO_ROOT/UI/rust_portal_gui.py"
+REQ_FILE="$REPO_ROOT/UI/requirements.txt"
 LAUNCHER="$SCRIPT_DIR/RustOrBust.command"
 UV_BIN="$HOME/.local/bin/uv"
 
@@ -134,12 +135,12 @@ install_safe_tk_python() {
 }
 
 if [ ! -f "$GUI_SCRIPT" ]; then
-    echo "Could not find UI/rust_portal_gui.py in $SCRIPT_DIR" >&2
+    echo "Could not find UI/rust_portal_gui.py in $REPO_ROOT" >&2
     exit 1
 fi
 
 if [ ! -f "$REQ_FILE" ]; then
-    echo "Could not find UI/requirements.txt in $SCRIPT_DIR" >&2
+    echo "Could not find UI/requirements.txt in $REPO_ROOT" >&2
     exit 1
 fi
 
@@ -152,7 +153,7 @@ fi
 
 if [ -z "${PYTHON_BIN:-}" ]; then
     echo "No safe Tk-enabled Python 3 interpreter was found." >&2
-    echo "Install a Python build with tkinter support, or install uv, then rerun install.sh." >&2
+    echo "Install a Python build with tkinter support, or install uv, then rerun macos/install.sh." >&2
     exit 1
 fi
 
@@ -196,7 +197,9 @@ fi
 cat > "$LAUNCHER" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-cd "\$(dirname "\$0")"
+SCRIPT_DIR="\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd)"
+REPO_ROOT="\$(CDPATH= cd -- "\$SCRIPT_DIR/.." && pwd)"
+cd "\$REPO_ROOT"
 exec "$VENV_DIR/bin/python3" UI/rust_portal_gui.py
 EOF
 chmod +x "$LAUNCHER"

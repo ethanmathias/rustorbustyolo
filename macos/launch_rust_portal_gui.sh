@@ -2,6 +2,7 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 VENV_PY="$HOME/Library/Application Support/rustorbust-venv/bin/python3"
 UV_PY="$HOME/.local/share/uv/python/cpython-3.13.12-macos-aarch64-none/bin/python3.13"
 
@@ -38,14 +39,14 @@ for py in "$VENV_PY" "$UV_PY" python3.13 python3.12 /Library/Frameworks/Python.f
     fi
 
     if is_safe_tk_python "$py"; then
-        if [ -f "$SCRIPT_DIR/UI/rust_portal_gui.py" ]; then
-            exec "$py" "$SCRIPT_DIR/UI/rust_portal_gui.py"
+        if [ -f "$REPO_ROOT/UI/rust_portal_gui.py" ]; then
+            exec "$py" "$REPO_ROOT/UI/rust_portal_gui.py"
         fi
-        exec "$py" "$SCRIPT_DIR/rust_portal_gui.py"
+        exec "$py" "$REPO_ROOT/rust_portal_gui.py"
     fi
 done
 
 echo "No compatible Python interpreter was found." >&2
 echo "Install or rebuild a Tk-enabled Python runtime whose _tkinter module does not require macOS 26." >&2
-echo "Then rerun ./install.sh to recreate the local launcher environment." >&2
+echo "Then rerun ./macos/install.sh to recreate the local launcher environment." >&2
 exit 1
