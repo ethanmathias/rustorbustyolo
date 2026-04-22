@@ -1,0 +1,18 @@
+=== Batch rust inference: Tue Apr 21 02:48:15 PM EDT 2026 ===
+
+image 1/7 /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/input/52a41c5f-66.jpg: 416x640 24 rusts, 157.8ms
+image 2/7 /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/input/8405ce2c-42.jpg: 416x640 4 rusts, 10.1ms
+image 3/7 /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/input/9df46e29-67.jpg: 416x640 15 rusts, 6.6ms
+image 4/7 /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/input/c17f9757-21.jpg: 416x640 6 rusts, 6.6ms
+image 5/7 /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/input/c8d2564b-13.jpg: 416x640 10 rusts, 6.6ms
+image 6/7 /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/input/f590c007-46.jpg: 416x640 5 rusts, 6.7ms
+image 7/7 /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/input/f8c27f4a-12.jpg: 416x640 15 rusts, 7.0ms
+Speed: 7.5ms preprocess, 28.8ms inference, 23.9ms postprocess per image at shape (1, 3, 416, 640)
+Results saved to [1m/u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/output/results[0m
+7 labels saved to /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/output/results/labels
+Processed 7 images
+Total detections: 79
+Annotated outputs: /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/output/results
+CSV summary: /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/output/results/summary.csv
+JSON summary: /u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260421_144811/output/results/summary.json
+=== Finished: Tue Apr 21 02:48:53 PM EDT 2026 ===

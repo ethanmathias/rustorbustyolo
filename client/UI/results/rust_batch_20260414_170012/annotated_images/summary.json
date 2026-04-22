@@ -1,0 +1,457 @@
+{
+  "model": "/u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260414_170012/35images.pt",
+  "input_dir": "/u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260414_170012/input",
+  "output_dir": "/u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260414_170012/output/results",
+  "images_processed": 64,
+  "total_detections": 715,
+  "rows": [
+    {
+      "image": "10.jpg",
+      "detections": 21,
+      "masks": 21,
+      "max_confidence": 0.8783,
+      "avg_confidence": 0.6545
+    },
+    {
+      "image": "11.jpg",
+      "detections": 2,
+      "masks": 2,
+      "max_confidence": 0.956,
+      "avg_confidence": 0.8676
+    },
+    {
+      "image": "12.jpg",
+      "detections": 15,
+      "masks": 15,
+      "max_confidence": 0.929,
+      "avg_confidence": 0.6823
+    },
+    {
+      "image": "13.jpg",
+      "detections": 10,
+      "masks": 10,
+      "max_confidence": 0.9075,
+      "avg_confidence": 0.6566
+    },
+    {
+      "image": "14.jpg",
+      "detections": 13,
+      "masks": 13,
+      "max_confidence": 0.934,
+      "avg_confidence": 0.72
+    },
+    {
+      "image": "15.jpg",
+      "detections": 10,
+      "masks": 10,
+      "max_confidence": 0.9145,
+      "avg_confidence": 0.7525
+    },
+    {
+      "image": "16.jpg",
+      "detections": 17,
+      "masks": 17,
+      "max_confidence": 0.8774,
+      "avg_confidence": 0.555
+    },
+    {
+      "image": "17.jpg",
+      "detections": 5,
+      "masks": 5,
+      "max_confidence": 0.7571,
+      "avg_confidence": 0.5328
+    },
+    {
+      "image": "18.jpg",
+      "detections": 9,
+      "masks": 9,
+      "max_confidence": 0.8729,
+      "avg_confidence": 0.5823
+    },
+    {
+      "image": "19.jpg",
+      "detections": 11,
+      "masks": 11,
+      "max_confidence": 0.7607,
+      "avg_confidence": 0.5653
+    },
+    {
+      "image": "20.jpg",
+      "detections": 6,
+      "masks": 6,
+      "max_confidence": 0.8933,
+      "avg_confidence": 0.6911
+    },
+    {
+      "image": "21.jpg",
+      "detections": 6,
+      "masks": 6,
+      "max_confidence": 0.7296,
+      "avg_confidence": 0.5883
+    },
+    {
+      "image": "22.jpg",
+      "detections": 10,
+      "masks": 10,
+      "max_confidence": 0.7762,
+      "avg_confidence": 0.6595
+    },
+    {
+      "image": "23.jpg",
+      "detections": 3,
+      "masks": 3,
+      "max_confidence": 0.868,
+      "avg_confidence": 0.5952
+    },
+    {
+      "image": "24.jpg",
+      "detections": 16,
+      "masks": 16,
+      "max_confidence": 0.9201,
+      "avg_confidence": 0.5842
+    },
+    {
+      "image": "25.jpg",
+      "detections": 14,
+      "masks": 14,
+      "max_confidence": 0.8937,
+      "avg_confidence": 0.6001
+    },
+    {
+      "image": "26.jpg",
+      "detections": 9,
+      "masks": 9,
+      "max_confidence": 0.9319,
+      "avg_confidence": 0.5734
+    },
+    {
+      "image": "27.jpg",
+      "detections": 19,
+      "masks": 19,
+      "max_confidence": 0.7001,
+      "avg_confidence": 0.4888
+    },
+    {
+      "image": "28.jpg",
+      "detections": 12,
+      "masks": 12,
+      "max_confidence": 0.8183,
+      "avg_confidence": 0.5335
+    },
+    {
+      "image": "29.jpg",
+      "detections": 6,
+      "masks": 6,
+      "max_confidence": 0.8661,
+      "avg_confidence": 0.726
+    },
+    {
+      "image": "30.jpg",
+      "detections": 12,
+      "masks": 12,
+      "max_confidence": 0.9033,
+      "avg_confidence": 0.6252
+    },
+    {
+      "image": "31.jpg",
+      "detections": 6,
+      "masks": 6,
+      "max_confidence": 0.8566,
+      "avg_confidence": 0.721
+    },
+    {
+      "image": "32.jpg",
+      "detections": 6,
+      "masks": 6,
+      "max_confidence": 0.7334,
+      "avg_confidence": 0.5951
+    },
+    {
+      "image": "33.jpg",
+      "detections": 4,
+      "masks": 4,
+      "max_confidence": 0.5482,
+      "avg_confidence": 0.379
+    },
+    {
+      "image": "34.jpg",
+      "detections": 6,
+      "masks": 6,
+      "max_confidence": 0.8194,
+      "avg_confidence": 0.6824
+    },
+    {
+      "image": "35.jpg",
+      "detections": 9,
+      "masks": 9,
+      "max_confidence": 0.7445,
+      "avg_confidence": 0.4148
+    },
+    {
+      "image": "36.jpg",
+      "detections": 3,
+      "masks": 3,
+      "max_confidence": 0.6474,
+      "avg_confidence": 0.4839
+    },
+    {
+      "image": "37.jpg",
+      "detections": 8,
+      "masks": 8,
+      "max_confidence": 0.4836,
+      "avg_confidence": 0.3365
+    },
+    {
+      "image": "38.jpg",
+      "detections": 10,
+      "masks": 10,
+      "max_confidence": 0.3649,
+      "avg_confidence": 0.3111
+    },
+    {
+      "image": "39.jpg",
+      "detections": 7,
+      "masks": 7,
+      "max_confidence": 0.718,
+      "avg_confidence": 0.5001
+    },
+    {
+      "image": "40.jpg",
+      "detections": 4,
+      "masks": 4,
+      "max_confidence": 0.4645,
+      "avg_confidence": 0.353
+    },
+    {
+      "image": "41.jpg",
+      "detections": 0,
+      "masks": 0,
+      "max_confidence": "",
+      "avg_confidence": ""
+    },
+    {
+      "image": "42.jpg",
+      "detections": 4,
+      "masks": 4,
+      "max_confidence": 0.7588,
+      "avg_confidence": 0.5059
+    },
+    {
+      "image": "43.jpg",
+      "detections": 7,
+      "masks": 7,
+      "max_confidence": 0.6551,
+      "avg_confidence": 0.4092
+    },
+    {
+      "image": "44.jpg",
+      "detections": 10,
+      "masks": 10,
+      "max_confidence": 0.8077,
+      "avg_confidence": 0.4634
+    },
+    {
+      "image": "45.jpg",
+      "detections": 7,
+      "masks": 7,
+      "max_confidence": 0.7967,
+      "avg_confidence": 0.6563
+    },
+    {
+      "image": "46.jpg",
+      "detections": 5,
+      "masks": 5,
+      "max_confidence": 0.7325,
+      "avg_confidence": 0.4655
+    },
+    {
+      "image": "47.jpg",
+      "detections": 4,
+      "masks": 4,
+      "max_confidence": 0.7109,
+      "avg_confidence": 0.5084
+    },
+    {
+      "image": "48.jpg",
+      "detections": 1,
+      "masks": 1,
+      "max_confidence": 0.792,
+      "avg_confidence": 0.792
+    },
+    {
+      "image": "49.jpg",
+      "detections": 17,
+      "masks": 17,
+      "max_confidence": 0.8039,
+      "avg_confidence": 0.4832
+    },
+    {
+      "image": "50.jpg",
+      "detections": 21,
+      "masks": 21,
+      "max_confidence": 0.7315,
+      "avg_confidence": 0.4704
+    },
+    {
+      "image": "51.jpg",
+      "detections": 23,
+      "masks": 23,
+      "max_confidence": 0.7173,
+      "avg_confidence": 0.4436
+    },
+    {
+      "image": "52.jpg",
+      "detections": 10,
+      "masks": 10,
+      "max_confidence": 0.7168,
+      "avg_confidence": 0.534
+    },
+    {
+      "image": "53.jpg",
+      "detections": 19,
+      "masks": 19,
+      "max_confidence": 0.8265,
+      "avg_confidence": 0.4844
+    },
+    {
+      "image": "54.jpg",
+      "detections": 24,
+      "masks": 24,
+      "max_confidence": 0.8339,
+      "avg_confidence": 0.4367
+    },
+    {
+      "image": "55.jpg",
+      "detections": 4,
+      "masks": 4,
+      "max_confidence": 0.5516,
+      "avg_confidence": 0.5108
+    },
+    {
+      "image": "56.jpg",
+      "detections": 10,
+      "masks": 10,
+      "max_confidence": 0.9359,
+      "avg_confidence": 0.6845
+    },
+    {
+      "image": "57.jpg",
+      "detections": 11,
+      "masks": 11,
+      "max_confidence": 0.7338,
+      "avg_confidence": 0.4658
+    },
+    {
+      "image": "58.jpg",
+      "detections": 9,
+      "masks": 9,
+      "max_confidence": 0.7359,
+      "avg_confidence": 0.4897
+    },
+    {
+      "image": "59.jpg",
+      "detections": 19,
+      "masks": 19,
+      "max_confidence": 0.7136,
+      "avg_confidence": 0.4429
+    },
+    {
+      "image": "60.jpg",
+      "detections": 9,
+      "masks": 9,
+      "max_confidence": 0.7678,
+      "avg_confidence": 0.527
+    },
+    {
+      "image": "61.jpg",
+      "detections": 7,
+      "masks": 7,
+      "max_confidence": 0.6695,
+      "avg_confidence": 0.5053
+    },
+    {
+      "image": "62.jpg",
+      "detections": 14,
+      "masks": 14,
+      "max_confidence": 0.6963,
+      "avg_confidence": 0.4705
+    },
+    {
+      "image": "63.jpg",
+      "detections": 17,
+      "masks": 17,
+      "max_confidence": 0.8199,
+      "avg_confidence": 0.5947
+    },
+    {
+      "image": "64.jpg",
+      "detections": 20,
+      "masks": 20,
+      "max_confidence": 0.8939,
+      "avg_confidence": 0.6235
+    },
+    {
+      "image": "65.jpg",
+      "detections": 21,
+      "masks": 21,
+      "max_confidence": 0.8826,
+      "avg_confidence": 0.631
+    },
+    {
+      "image": "66.jpg",
+      "detections": 24,
+      "masks": 24,
+      "max_confidence": 0.8152,
+      "avg_confidence": 0.5213
+    },
+    {
+      "image": "67.jpg",
+      "detections": 15,
+      "masks": 15,
+      "max_confidence": 0.925,
+      "avg_confidence": 0.691
+    },
+    {
+      "image": "68.jpg",
+      "detections": 14,
+      "masks": 14,
+      "max_confidence": 0.594,
+      "avg_confidence": 0.4357
+    },
+    {
+      "image": "69.jpg",
+      "detections": 12,
+      "masks": 12,
+      "max_confidence": 0.8921,
+      "avg_confidence": 0.6005
+    },
+    {
+      "image": "70.jpg",
+      "detections": 16,
+      "masks": 16,
+      "max_confidence": 0.8337,
+      "avg_confidence": 0.5635
+    },
+    {
+      "image": "71.jpg",
+      "detections": 14,
+      "masks": 14,
+      "max_confidence": 0.9074,
+      "avg_confidence": 0.5645
+    },
+    {
+      "image": "72.jpg",
+      "detections": 16,
+      "masks": 16,
+      "max_confidence": 0.911,
+      "avg_confidence": 0.6796
+    },
+    {
+      "image": "73.jpg",
+      "detections": 22,
+      "masks": 22,
+      "max_confidence": 0.8596,
+      "avg_confidence": 0.5901
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+remote_workspace=/u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260420_131226
+remote_output=/u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260420_131226/output/results
+job_id=5860652
+state=COMPLETED
