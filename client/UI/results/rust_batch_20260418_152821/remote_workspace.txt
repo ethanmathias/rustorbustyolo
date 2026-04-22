@@ -1,4 +1,0 @@
-remote_workspace=/u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260418_152821
-remote_output=/u/fkm5yp/rustorbustyolo_jobs/rust_batch_20260418_152821/output/results
-job_id=5844914
-state=COMPLETED
