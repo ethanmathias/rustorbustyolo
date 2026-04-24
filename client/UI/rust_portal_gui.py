@@ -60,7 +60,9 @@ class SubmissionConfig:
 def discover_model_candidates(repo_root):
     seen, out = set(), []
     parent_root = repo_root.parent
+    project_root = repo_root.parent.parent
     preferred = [
+        project_root / "training" / "models" / "35images.pt",
         parent_root / "models" / "35images.pt",
         repo_root / "models" / "35images.pt",
         parent_root / "35images.pt",
