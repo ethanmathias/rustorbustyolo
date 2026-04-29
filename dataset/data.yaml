@@ -1,6 +1,0 @@
-path: /u/fkm5yp/rustdetection/dataset
-train: train/images
-val: val/images
-
-nc: 1
-names: ['rust']

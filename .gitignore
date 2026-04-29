@@ -1,2 +1,5 @@
 .DS_Store
 ._*
+__pycache__/
+*.pt
+client/UI/results/
